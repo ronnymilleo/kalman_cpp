@@ -6,7 +6,6 @@
 #define KALMAN_H
 
 #include <vector>
-#include <memory>
 
 class kalman {
 private:
@@ -59,8 +58,8 @@ public:
     void update(const std::vector<double>& measurement);
 
     // Getters
-    std::vector<double> getState() const;
-    std::vector<std::vector<double>> getErrorCovariance() const;
+    std::vector<double>& getState();
+    std::vector<std::vector<double>>& getErrorCovariance();
     double getStateElement(int index) const;
 
     // Utility methods
@@ -68,30 +67,6 @@ public:
     bool isInitialized() const;
 
 private:
-    // Matrix operations
-    std::vector<std::vector<double>> matrixMultiply(
-        const std::vector<std::vector<double>>& A,
-        const std::vector<std::vector<double>>& B) const;
-
-    std::vector<double> matrixVectorMultiply(
-        const std::vector<std::vector<double>>& A,
-        const std::vector<double>& v) const;
-
-    std::vector<std::vector<double>> matrixAdd(
-        const std::vector<std::vector<double>>& A,
-        const std::vector<std::vector<double>>& B) const;
-
-    std::vector<std::vector<double>> matrixSubtract(
-        const std::vector<std::vector<double>>& A,
-        const std::vector<std::vector<double>>& B) const;
-
-    std::vector<std::vector<double>> matrixTranspose(
-        const std::vector<std::vector<double>>& A) const;
-
-    std::vector<std::vector<double>> matrixInverse(
-        const std::vector<std::vector<double>>& A) const;
-
-    void createIdentityMatrix(int size);
     bool initialized;
 };
 

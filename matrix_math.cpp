@@ -7,8 +7,11 @@
 void matrix_add(const std::vector<std::vector<double>>& A,
                 const std::vector<std::vector<double>>& B,
                 std::vector<std::vector<double>>& result) {
-    if (A.empty() || B.empty() || result.empty() || A.size() != B.size() || A[0].size() != B[0].size()) {
+    if (A.empty() || B.empty() || A.size() != B.size() || A[0].size() != B[0].size()) {
         throw std::invalid_argument("Matrix size mismatch");
+    }
+    if (result.size() != A.size() || result[0].size() != A[0].size()) {
+        throw std::invalid_argument("Result matrix size mismatch");
     }
 
     const size_t rows = A.size();
@@ -24,8 +27,11 @@ void matrix_add(const std::vector<std::vector<double>>& A,
 void matrix_subtract(const std::vector<std::vector<double>>& A,
                      const std::vector<std::vector<double>>& B,
                      std::vector<std::vector<double>>& result) {
-    if (A.empty() || B.empty() || result.empty() || A.size() != B.size() || A[0].size() != B[0].size()) {
+    if (A.empty() || B.empty() || A.size() != B.size() || A[0].size() != B[0].size()) {
         throw std::invalid_argument("Matrix size mismatch");
+    }
+    if (result.size() != A.size() || result[0].size() != A[0].size()) {
+        throw std::invalid_argument("Result matrix size mismatch");
     }
 
     const size_t rows = A.size();
@@ -40,7 +46,7 @@ void matrix_subtract(const std::vector<std::vector<double>>& A,
 
 void matrix_transpose(const std::vector<std::vector<double>>& A,
                       std::vector<std::vector<double>>& result) {
-    if (A.empty() || result.empty() || A[0].size() != result.size() || A.size() != result[0].size()) {
+    if (A.empty() || A[0].size() != result.size() || A.size() != result[0].size()) {
         throw std::invalid_argument("Matrix size mismatch");
     }
 
@@ -57,8 +63,11 @@ void matrix_transpose(const std::vector<std::vector<double>>& A,
 void matrix_multiply(const std::vector<std::vector<double>>& A,
                      const std::vector<std::vector<double>>& B,
                      std::vector<std::vector<double>>& result) {
-    if (A.empty() || B.empty() || result.empty() || A[0].size() != B.size()) {
+    if (A.empty() || B.empty() || A[0].size() != B.size()) {
         throw std::invalid_argument("Matrix size mismatch");
+    }
+    if (result.size() != A.size() || result[0].size() != B[0].size()) {
+        throw std::invalid_argument("Result matrix size mismatch");
     }
 
     const size_t rowsA = A.size();
@@ -67,6 +76,7 @@ void matrix_multiply(const std::vector<std::vector<double>>& A,
 
     for (size_t i = 0; i < rowsA; i++) {
         for (size_t j = 0; j < colsB; j++) {
+            result[i][j] = 0.0; // Corrigido: zera antes de acumular
             for (size_t k = 0; k < colsA; k++) {
                 result[i][j] += A[i][k] * B[k][j];
             }
@@ -77,14 +87,18 @@ void matrix_multiply(const std::vector<std::vector<double>>& A,
 void matrix_vector_multiply(const std::vector<std::vector<double>>& A,
                             const std::vector<double>& v,
                             std::vector<double>& result) {
-    if (A.empty() || v.empty() || result.empty() || A[0].size() != v.size()) {
+    if (A.empty() || v.empty() || A[0].size() != v.size()) {
         throw std::invalid_argument("Matrix and vector size mismatch");
+    }
+    if (result.size() != A.size()) {
+        throw std::invalid_argument("Result vector size mismatch");
     }
 
     const size_t rows = A.size();
     const size_t cols = A[0].size();
 
     for (size_t i = 0; i < rows; i++) {
+        result[i] = 0.0; // Corrigido: zera antes de acumular
         for (size_t j = 0; j < cols; j++) {
             result[i] += A[i][j] * v[j];
         }
@@ -95,9 +109,11 @@ void matrix_identity(std::vector<std::vector<double>>& result) {
     if (result.empty() || result.size() != result[0].size()) {
         throw std::invalid_argument("Not square matrix");
     }
-
-    for (int i = 0; i < result.size(); i++) {
-        result[i][i] = 1.0;
+    size_t n = result.size();
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = 0; j < n; j++) {
+            result[i][j] = (i == j) ? 1.0 : 0.0;
+        }
     }
 }
 

@@ -6,8 +6,10 @@
 #include <stdexcept>
 #include <cmath>
 
+#include "matrix_math.h"
+
 // Constructor with dimensions
-kalman::kalman(int stateDimension, int measurementDimension, int controlDimension)
+kalman::kalman(const int stateDimension, const int measurementDimension, const int controlDimension)
     : stateDim(stateDimension), measurementDim(measurementDimension),
       controlDim(controlDimension), initialized(false) {
 
@@ -25,7 +27,8 @@ kalman::kalman(int stateDimension, int measurementDimension, int controlDimensio
         controlMatrix.resize(stateDim, std::vector<double>(controlDim, 0.0));
     }
 
-    createIdentityMatrix(stateDim);
+    identity.resize(stateDim, std::vector<double>(stateDim, 0.0));
+    matrix_identity(identity);
 }
 
 // Initialize state vector
@@ -92,23 +95,32 @@ void kalman::predict(const std::vector<double>& control) {
     }
 
     // Predict state: x = F * x + B * u
-    state = matrixVectorMultiply(stateTransition, state);
+    std::vector<double> result(stateDim);
+    matrix_vector_multiply(stateTransition, state, result);
+    for (int i = 0; i < stateDim; i++) {
+        state[i] = result[i];
+    }
 
     if (!control.empty() && controlDim > 0) {
         if (control.size() != controlDim) {
             throw std::invalid_argument("Control vector size mismatch");
         }
-        auto controlContribution = matrixVectorMultiply(controlMatrix, control);
+        std::vector<double> controlContribution(stateDim);
+        matrix_vector_multiply(controlMatrix, control, controlContribution);
         for (int i = 0; i < stateDim; i++) {
             state[i] += controlContribution[i];
         }
     }
 
+    std::vector<std::vector<double>> FP(stateDim, std::vector<double>(stateDim, 0.0));
+    std::vector<std::vector<double>> FT(stateDim, std::vector<double>(stateDim, 0.0));
+    std::vector<std::vector<double>> FPFT(stateDim, std::vector<double>(stateDim, 0.0));
+
     // Predict error covariance: P = F * P * F^T + Q
-    auto FP = matrixMultiply(stateTransition, errorCovariance);
-    auto FT = matrixTranspose(stateTransition);
-    auto FPFT = matrixMultiply(FP, FT);
-    errorCovariance = matrixAdd(FPFT, processNoise);
+    matrix_multiply(stateTransition, errorCovariance, FP);
+    matrix_transpose(stateTransition, FT);
+    matrix_multiply(FP, FT, FPFT);
+    matrix_add(FPFT, processNoise, errorCovariance);
 }
 
 // Update step (correction)
@@ -121,42 +133,65 @@ void kalman::update(const std::vector<double>& measurement) {
         throw std::invalid_argument("Measurement vector size mismatch");
     }
 
+    std::vector<double> predictedMeasurement(measurementDim);
+
     // Calculate innovation: y = z - H * x
-    auto predictedMeasurement = matrixVectorMultiply(observationMatrix, state);
+    matrix_vector_multiply(observationMatrix, state, predictedMeasurement);
     std::vector<double> innovation(measurementDim);
     for (int i = 0; i < measurementDim; i++) {
         innovation[i] = measurement[i] - predictedMeasurement[i];
     }
 
+    std::vector<std::vector<double>> HP(measurementDim, std::vector<double>(stateDim, 0.0));
+    std::vector<std::vector<double>> HT(stateDim, std::vector<double>(measurementDim, 0.0));
+    std::vector<std::vector<double>> HPHT(measurementDim, std::vector<double>(measurementDim, 0.0));
+    std::vector<std::vector<double>> S(measurementDim, std::vector<double>(measurementDim, 0.0));
+
     // Calculate innovation covariance: S = H * P * H^T + R
-    auto HP = matrixMultiply(observationMatrix, errorCovariance);
-    auto HT = matrixTranspose(observationMatrix);
-    auto HPHT = matrixMultiply(HP, HT);
-    auto S = matrixAdd(HPHT, measurementNoise);
+    matrix_multiply(observationMatrix, errorCovariance, HP);
+    matrix_transpose(observationMatrix, HT);
+    matrix_multiply(HP, HT, HPHT);
+    matrix_add(HPHT, measurementNoise, S);
+
+    std::vector<std::vector<double>> PHT(stateDim, std::vector<double>(measurementDim, 0.0));
+    std::vector<std::vector<double>> SInv(measurementDim, std::vector<double>(measurementDim, 0.0));
+    std::vector<std::vector<double>> K(stateDim, std::vector<double>(measurementDim, 0.0));
 
     // Calculate Kalman gain: K = P * H^T * S^(-1)
-    auto PHT = matrixMultiply(errorCovariance, HT);
-    auto SInv = matrixInverse(S);
-    auto K = matrixMultiply(PHT, SInv);
+    matrix_multiply(errorCovariance, HT, PHT);
+    matrix_inverse(S, SInv);
+    matrix_multiply(PHT, SInv, K);
+
+    std::vector<double> Ky(stateDim);
 
     // Update state: x = x + K * y
-    auto Ky = matrixVectorMultiply(K, innovation);
+    matrix_vector_multiply(K, innovation, Ky);
     for (int i = 0; i < stateDim; i++) {
         state[i] += Ky[i];
     }
 
+    std::vector<std::vector<double>> KH(stateDim, std::vector<double>(stateDim, 0.0));
+    std::vector<std::vector<double>> IKH(stateDim, std::vector<double>(stateDim, 0.0));
+    std::vector<std::vector<double>> result(stateDim, std::vector<double>(stateDim, 0.0));
+
     // Update error covariance: P = (I - K * H) * P
-    auto KH = matrixMultiply(K, observationMatrix);
-    auto IKH = matrixSubtract(identity, KH);
-    errorCovariance = matrixMultiply(IKH, errorCovariance);
+    matrix_multiply(K, observationMatrix, KH);
+    matrix_subtract(identity, KH, IKH);
+    matrix_multiply(IKH, errorCovariance, result);
+
+    for (int i = 0; i < stateDim; i++) {
+        for (int j = 0; j < stateDim; j++) {
+            errorCovariance[i][j] = result[i][j];
+        }
+    }
 }
 
 // Getters
-std::vector<double> kalman::getState() const {
+std::vector<double>& kalman::getState() {
     return state;
 }
 
-std::vector<std::vector<double>> kalman::getErrorCovariance() const {
+std::vector<std::vector<double>>& kalman::getErrorCovariance() {
     return errorCovariance;
 }
 
@@ -182,165 +217,4 @@ void kalman::reset() {
 
 bool kalman::isInitialized() const {
     return initialized;
-}
-
-// Matrix operations
-std::vector<std::vector<double>> kalman::matrixMultiply(
-    const std::vector<std::vector<double>>& A,
-    const std::vector<std::vector<double>>& B) const {
-
-    int rowsA = A.size();
-    int colsA = A[0].size();
-    int colsB = B[0].size();
-
-    std::vector<std::vector<double>> result(rowsA, std::vector<double>(colsB, 0.0));
-
-    for (int i = 0; i < rowsA; i++) {
-        for (int j = 0; j < colsB; j++) {
-            for (int k = 0; k < colsA; k++) {
-                result[i][j] += A[i][k] * B[k][j];
-            }
-        }
-    }
-
-    return result;
-}
-
-std::vector<double> kalman::matrixVectorMultiply(
-    const std::vector<std::vector<double>>& A,
-    const std::vector<double>& v) const {
-
-    int rows = A.size();
-    int cols = A[0].size();
-
-    std::vector<double> result(rows, 0.0);
-
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            result[i] += A[i][j] * v[j];
-        }
-    }
-
-    return result;
-}
-
-std::vector<std::vector<double>> kalman::matrixAdd(
-    const std::vector<std::vector<double>>& A,
-    const std::vector<std::vector<double>>& B) const {
-
-    int rows = A.size();
-    int cols = A[0].size();
-
-    std::vector<std::vector<double>> result(rows, std::vector<double>(cols));
-
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            result[i][j] = A[i][j] + B[i][j];
-        }
-    }
-
-    return result;
-}
-
-std::vector<std::vector<double>> kalman::matrixSubtract(
-    const std::vector<std::vector<double>>& A,
-    const std::vector<std::vector<double>>& B) const {
-
-    int rows = A.size();
-    int cols = A[0].size();
-
-    std::vector<std::vector<double>> result(rows, std::vector<double>(cols));
-
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            result[i][j] = A[i][j] - B[i][j];
-        }
-    }
-
-    return result;
-}
-
-std::vector<std::vector<double>> kalman::matrixTranspose(
-    const std::vector<std::vector<double>>& A) const {
-
-    int rows = A.size();
-    int cols = A[0].size();
-
-    std::vector<std::vector<double>> result(cols, std::vector<double>(rows));
-
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            result[j][i] = A[i][j];
-        }
-    }
-
-    return result;
-}
-
-std::vector<std::vector<double>> kalman::matrixInverse(
-    const std::vector<std::vector<double>>& A) const {
-
-    int n = A.size();
-    std::vector<std::vector<double>> augmented(n, std::vector<double>(2 * n, 0.0));
-
-    // Create augmented matrix [A|I]
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            augmented[i][j] = A[i][j];
-        }
-        augmented[i][i + n] = 1.0;
-    }
-
-    // Gaussian elimination
-    for (int i = 0; i < n; i++) {
-        // Find pivot
-        int maxRow = i;
-        for (int k = i + 1; k < n; k++) {
-            if (std::abs(augmented[k][i]) > std::abs(augmented[maxRow][i])) {
-                maxRow = k;
-            }
-        }
-
-        // Swap rows
-        if (maxRow != i) {
-            std::swap(augmented[i], augmented[maxRow]);
-        }
-
-        // Make diagonal element 1
-        double pivot = augmented[i][i];
-        if (std::abs(pivot) < 1e-10) {
-            throw std::runtime_error("Matrix is singular");
-        }
-
-        for (int j = 0; j < 2 * n; j++) {
-            augmented[i][j] /= pivot;
-        }
-
-        // Eliminate column
-        for (int k = 0; k < n; k++) {
-            if (k != i) {
-                double factor = augmented[k][i];
-                for (int j = 0; j < 2 * n; j++) {
-                    augmented[k][j] -= factor * augmented[i][j];
-                }
-            }
-        }
-    }
-
-    // Extract inverse matrix
-    std::vector<std::vector<double>> result(n, std::vector<double>(n));
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            result[i][j] = augmented[i][j + n];
-        }
-    }
-
-    return result;
-}
-
-void kalman::createIdentityMatrix(int size) {
-    identity.resize(size, std::vector<double>(size, 0.0));
-    for (int i = 0; i < size; i++) {
-        identity[i][i] = 1.0;
-    }
 }
