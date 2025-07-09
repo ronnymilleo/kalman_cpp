@@ -1,11 +1,31 @@
 #include <iostream>
+#include <iomanip>
+#include <string>
 #include "kalman.h"
 
+// Simple color codes
+#define RESET   "\033[0m"
+#define BOLD    "\033[1m"
+#define GREEN   "\033[32m"
+#define BLUE    "\033[34m"
+#define YELLOW  "\033[33m"
+
+void printHeader() {
+    std::cout << BOLD << "\n=== KALMAN FILTER DEMO ===" << RESET << "\n";
+    std::cout << "1D Position Tracking with Velocity\n\n";
+}
+
+void printSection(const std::string& title) {
+    std::cout << BLUE << title << RESET << "\n";
+    std::cout << std::string(title.length(), '-') << "\n";
+}
+
 int main() {
-    std::cout << "Kalman Filter Demo\n";
-    std::cout << "==================\n\n";
+    printHeader();
 
     try {
+        printSection("Filter Initialization");
+
         // Example: 1D position tracking with velocity
         // State: [position, velocity]
         // Measurement: [position]
@@ -53,15 +73,20 @@ int main() {
         };
         kf.setErrorCovariance(P);
 
-        std::cout << "Kalman filter initialized successfully!\n";
-        std::cout << "Initial state: [" << kf.getStateElement(0) << ", " << kf.getStateElement(1) << "]\n\n";
+        std::cout << GREEN << "Filter configured successfully!" << RESET << "\n";
+        std::cout << "State: [position, velocity] - Measurement: [position]\n";
+        std::cout << "Initial Position: " << std::fixed << std::setprecision(3)
+                  << kf.getStateElement(0) << " units\n";
+        std::cout << "Initial Velocity: " << std::fixed << std::setprecision(3)
+                  << kf.getStateElement(1) << " units/s\n\n";
 
         // Simulate some measurements
         std::vector<double> measurements = {1.2, 2.8, 4.1, 5.9, 7.8, 9.2, 11.1, 12.9};
 
-        std::cout << "Running Kalman filter with measurements:\n";
-        std::cout << "Step\tMeasurement\tEstimated Pos\tEstimated Vel\n";
-        std::cout << "----\t-----------\t-------------\t-------------\n";
+        printSection("Processing Measurements");
+
+        std::cout << BOLD << "Step  Measurement  Position  Velocity" << RESET << "\n";
+        std::cout << "----  -----------  --------  --------\n";
 
         for (size_t i = 0; i < measurements.size(); i++) {
             // Predict step
@@ -71,15 +96,29 @@ int main() {
             std::vector<double> z = {measurements[i]};
             kf.update(z);
 
-            // Display results
-            std::cout << i + 1 << "\t" << measurements[i] << "\t\t"
-                      << kf.getStateElement(0) << "\t\t"
-                      << kf.getStateElement(1) << "\n";
+            std::cout << std::setw(4) << (i + 1) << "  ";
+            std::cout << std::setw(11) << std::fixed << std::setprecision(3) << measurements[i] << "  ";
+            std::cout << std::setw(8) << std::fixed << std::setprecision(3) << kf.getStateElement(0) << "  ";
+            std::cout << std::setw(8) << std::fixed << std::setprecision(3) << kf.getStateElement(1) << "\n";
         }
 
-        std::cout << "\nFinal estimated state:\n";
-        std::cout << "Position: " << kf.getStateElement(0) << "\n";
-        std::cout << "Velocity: " << kf.getStateElement(1) << "\n";
+        printSection("Final Results");
+
+        // Calculate and display performance metrics
+        double finalPos = kf.getStateElement(0);
+        double finalVel = kf.getStateElement(1);
+        double lastMeasurement = measurements.back();
+        double estimationError = std::abs(finalPos - lastMeasurement);
+
+        std::cout << BOLD << "Final Estimated State:" << RESET << "\n";
+        std::cout << "Position: " << std::fixed << std::setprecision(4) << finalPos << " units\n";
+        std::cout << "Velocity: " << std::fixed << std::setprecision(4) << finalVel << " units/s\n\n";
+
+        std::cout << "Performance:\n";
+        std::cout << "Last measurement: " << lastMeasurement << "\n";
+        std::cout << "Position error: " << std::fixed << std::setprecision(4) << estimationError << "\n";
+
+        std::cout << "\n" << GREEN << "Processing completed successfully!" << RESET << "\n";
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
