@@ -10,8 +10,10 @@ add_subdirectory(tests)
 # Main Kalman executable
 add_executable(Kalman
     main.cpp
-    Kalman.cpp
-    Kalman.h
+    kalman.cpp
     matrix_math.cpp
-    matrix_math.h
+)
+
+target_include_directories(Kalman PRIVATE
+    ${CMAKE_SOURCE_DIR}
 )
