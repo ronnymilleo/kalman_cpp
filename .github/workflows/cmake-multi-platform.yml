@@ -4,9 +4,9 @@ name: CMake on multiple platforms
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "develop", "feature/*", "release/*", "hotfix/*" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
 
 jobs:
   build:
@@ -24,7 +24,7 @@ jobs:
       # To add more build types (Release, Debug, RelWithDebInfo, etc.) customize the build_type list.
       matrix:
         os: [ubuntu-latest, windows-latest]
-        build_type: [Release]
+        build_type: [Debug, Release]
         c_compiler: [gcc, clang, cl]
         include:
           - os: windows-latest
@@ -47,6 +47,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Check C++ headers
+      shell: bash
+      run: |
+        echo "Checking for common C++ header issues..."
+        grep -r "invalid_argument\|runtime_error\|logic_error" --include="*.cpp" --include="*.hpp" --include="*.h" . || true
+        echo "Files that might need <stdexcept>:"
+        grep -l "invalid_argument\|runtime_error\|logic_error" --include="*.cpp" --include="*.hpp" --include="*.h" . || echo "None found"
+
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
@@ -62,6 +70,7 @@ jobs:
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -DCMAKE_CXX_FLAGS="-Wall -Wextra"
         -S ${{ github.workspace }}
 
     - name: Build
