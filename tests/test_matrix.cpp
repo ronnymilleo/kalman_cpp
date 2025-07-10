@@ -3,7 +3,7 @@
 //
 
 #include <gtest/gtest.h>
-#include "matrix_math.h"
+#include "../matrix_math.h"
 
 TEST(MatrixMathTest, Add) {
     const std::vector<std::vector<double>> A = {{1, 2}, {3, 4}};

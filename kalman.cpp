@@ -4,7 +4,6 @@
 
 #include "kalman.h"
 #include <stdexcept>
-#include <cmath>
 
 #include "matrix_math.h"
 
@@ -195,7 +194,7 @@ std::vector<std::vector<double>>& kalman::getErrorCovariance() {
     return errorCovariance;
 }
 
-double kalman::getStateElement(int index) const {
+double kalman::getStateElement(const int index) const {
     if (index < 0 || index >= stateDim) {
         throw std::out_of_range("State index out of range");
     }
