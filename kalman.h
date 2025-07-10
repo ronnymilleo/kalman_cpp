@@ -34,9 +34,9 @@ private:
     std::vector<std::vector<double>> identity;
 
     // Dimensions
-    int stateDim;
-    int measurementDim;
-    int controlDim;
+    size_t stateDim{};
+    size_t measurementDim{};
+    size_t controlDim{};
 
 public:
     // Constructors
@@ -67,7 +67,7 @@ public:
     bool isInitialized() const;
 
 private:
-    bool initialized;
+    bool initialized{};
 };
 
 #endif //KALMAN_H
