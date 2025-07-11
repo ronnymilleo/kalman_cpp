@@ -5,6 +5,10 @@ project(Kalman)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Enable testing
+enable_testing()
+
+# Add tests subdirectory
 add_subdirectory(tests)
 
 # Main Kalman executable

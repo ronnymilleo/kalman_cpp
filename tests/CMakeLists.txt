@@ -35,7 +35,7 @@ target_link_libraries(test_matrix
 # Include directories for the test
 target_include_directories(test_matrix
         PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}../
+        ${CMAKE_CURRENT_SOURCE_DIR}/../
 )
 
 include(GoogleTest)

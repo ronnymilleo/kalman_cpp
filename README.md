@@ -47,7 +47,8 @@ cmake --build --preset debug
 cmake --build --preset release
 
 # Run tests
-ctest --preset tests
+ctest --preset debug          # Run tests (debug build)
+ctest --preset release        # Run tests (release build)
 ```
 
 ## Usage Example

@@ -40,7 +40,11 @@
   ],
   "testPresets": [
     {
-      "name": "tests",
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
       "configurePreset": "release"
     }
   ]
