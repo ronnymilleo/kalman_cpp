@@ -1,6 +1,30 @@
-//
-// Created by Ronny Milleo on 08/07/25.
-//
+/**
+ * @file kalman.cpp
+ * @brief Kalman filter class implementation
+ * @author ronnymilleo
+ * @date 08/07/25
+ * @version 1.0
+ * 
+ * This file implements the Kalman filter class for real-time state estimation.
+ * The implementation follows the standard discrete-time Kalman filter algorithm
+ * with prediction and update steps. All matrix operations are delegated to
+ * the matrix_math module for modularity and maintainability.
+ * 
+ * @details Implementation features:
+ * - Standard discrete-time Kalman filter equations
+ * - Comprehensive error checking and validation
+ * - Efficient memory management with pre-allocated matrices
+ * - Exception-safe design with proper error handling
+ * - Support for optional control inputs
+ * - Robust initialization and state management
+ * 
+ * @note Uses std::vector for dynamic matrix storage
+ * @note All matrix operations are performed through matrix_math functions
+ * @note Filter state is maintained between predict/update cycles
+ * 
+ * @see kalman.h for class interface documentation
+ * @see matrix_math.h for matrix operation implementations
+ */
 
 #include "kalman.h"
 #include <stdexcept>

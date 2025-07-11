@@ -1,6 +1,29 @@
-//
-// Created by Ronny Milleo on 08/07/25.
-//
+/**
+ * @file test_matrix.cpp
+ * @brief Unit tests for matrix mathematics operations
+ * @author ronnymilleo
+ * @date 08/07/25
+ * @version 1.0
+ * 
+ * This file contains comprehensive unit tests for the matrix_math module
+ * using the Google Test framework. Tests cover all matrix operations
+ * including edge cases, error conditions, and numerical accuracy.
+ * 
+ * @details Test coverage:
+ * - Basic operations: addition, subtraction, multiplication
+ * - Matrix transformations: transpose, inverse
+ * - Vector operations: matrix-vector multiplication
+ * - Utility functions: identity matrix generation
+ * - Error handling: dimension mismatches, invalid inputs
+ * - Numerical accuracy: floating-point precision tests
+ * 
+ * @note Tests use EXPECT_EQ for exact comparisons where appropriate
+ * @note Floating-point comparisons should use EXPECT_NEAR for tolerance
+ * @note Each test is self-contained and independent
+ * 
+ * @see matrix_math.h for function documentation
+ * @see matrix_math.cpp for implementation details
+ */
 
 #include <gtest/gtest.h>
 #include "../matrix_math.h"

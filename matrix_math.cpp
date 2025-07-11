@@ -1,6 +1,29 @@
-//
-// Created by Ronny Milleo on 08/07/25.
-//
+/**
+ * @file matrix_math.cpp
+ * @brief Matrix mathematics operations implementation
+ * @author ronnymilleo
+ * @date 08/07/25
+ * @version 1.0
+ * 
+ * This file implements essential matrix operations for the Kalman filter.
+ * All functions provide comprehensive error checking and efficient computation
+ * of linear algebra operations using std::vector-based matrices.
+ * 
+ * @details Implementation features:
+ * - Robust error checking for dimension mismatches
+ * - Efficient algorithms for matrix operations
+ * - Gaussian elimination with partial pivoting for matrix inversion
+ * - Clear separation of concerns for each operation
+ * - Exception-safe design with proper error messages
+ * - Optimized loops for better performance
+ * 
+ * @note All matrices are stored in row-major order
+ * @note Functions assume pre-allocated result containers
+ * @note Matrix inversion uses partial pivoting for numerical stability
+ * 
+ * @see matrix_math.h for function documentation
+ * @see kalman.cpp for usage examples
+ */
 
 #include "matrix_math.h"
 #include <stdexcept>

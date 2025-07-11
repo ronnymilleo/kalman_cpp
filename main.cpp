@@ -1,3 +1,30 @@
+/**
+ * @file main.cpp
+ * @brief Kalman filter demonstration and example usage
+ * @author ronnymilleo
+ * @date 08/07/25
+ * @version 1.0
+ * 
+ * This file demonstrates the usage of the Kalman filter library with
+ * a practical example of 1D position tracking with velocity estimation.
+ * The demo shows how to configure and use the filter for real-time
+ * state estimation.
+ * 
+ * @details Example features:
+ * - 1D position tracking with velocity
+ * - Constant velocity motion model
+ * - Simulated noisy position measurements
+ * - Real-time filter performance visualization
+ * - Complete setup and cleanup procedures
+ * 
+ * @note This example uses a simple constant velocity model
+ * @note Measurement noise and process noise are configurable
+ * @note Color output is used for better visualization
+ * 
+ * @see kalman.h for API documentation
+ * @see matrix_math.h for matrix operations
+ */
+
 #include <iostream>
 #include <iomanip>
 #include <string>
