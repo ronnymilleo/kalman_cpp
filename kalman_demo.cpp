@@ -1,5 +1,5 @@
 /**
- * @file main.cpp
+ * @file kalman_demo.cpp
  * @brief Kalman filter demonstration and example usage
  * @author ronnymilleo
  * @date 08/07/25

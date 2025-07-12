@@ -81,6 +81,70 @@ if(KALMAN_ENABLE_WARNINGS AND DEFINED KALMAN_WARNING_FLAGS)
     target_compile_options(test_matrix PRIVATE ${KALMAN_WARNING_FLAGS})
 endif()
 
+# Standard Kalman Filter test suite
+add_executable(test_kalman
+    test_kalman.cpp
+)
+
+# Link test executable with the main library and Google Test
+target_link_libraries(test_kalman
+    PRIVATE
+        kalman_lib          # Link with main library target
+        GTest::gtest
+        GTest::gtest_main
+)
+
+# Configure include directories for tests
+target_include_directories(test_kalman
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../  # Access to source headers
+)
+
+# Set test executable properties
+set_target_properties(test_kalman PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    FOLDER "Tests"
+)
+
+# Apply same warning flags as main project if enabled
+if(KALMAN_ENABLE_WARNINGS AND DEFINED KALMAN_WARNING_FLAGS)
+    target_compile_options(test_kalman PRIVATE ${KALMAN_WARNING_FLAGS})
+endif()
+
+# Extended Kalman Filter test suite
+add_executable(test_extended_kalman
+    test_extended_kalman.cpp
+)
+
+# Link test executable with the main library and Google Test
+target_link_libraries(test_extended_kalman
+    PRIVATE
+        kalman_lib          # Link with main library target
+        GTest::gtest
+        GTest::gtest_main
+)
+
+# Configure include directories for tests
+target_include_directories(test_extended_kalman
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../  # Access to source headers
+)
+
+# Set test executable properties
+set_target_properties(test_extended_kalman PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    FOLDER "Tests"
+)
+
+# Apply same warning flags as main project if enabled
+if(KALMAN_ENABLE_WARNINGS AND DEFINED KALMAN_WARNING_FLAGS)
+    target_compile_options(test_extended_kalman PRIVATE ${KALMAN_WARNING_FLAGS})
+endif()
+
 # =============================================================================
 # Test Discovery and Registration
 # =============================================================================
@@ -96,6 +160,29 @@ gtest_discover_tests(test_matrix
         TIMEOUT 30
 )
 
+# Discover Standard Kalman Filter tests
+gtest_discover_tests(test_kalman
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    PROPERTIES
+        LABELS "unit"
+        TIMEOUT 30
+)
+
+# Discover Extended Kalman Filter tests
+gtest_discover_tests(test_extended_kalman
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    PROPERTIES
+        LABELS "unit"
+        TIMEOUT 30
+)
+
+gtest_discover_tests(test_extended_kalman
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    PROPERTIES
+        LABELS "unit"
+        TIMEOUT 30
+)
+
 # =============================================================================
 # Custom Test Targets
 # =============================================================================
@@ -103,7 +190,7 @@ gtest_discover_tests(test_matrix
 # Create a custom target to run all tests with verbose output
 add_custom_target(run_tests
     COMMAND ${CMAKE_CTEST_COMMAND} --verbose --output-on-failure
-    DEPENDS test_matrix
+    DEPENDS test_matrix test_kalman test_extended_kalman
     COMMENT "Running all unit tests with verbose output"
     VERBATIM
 )
@@ -114,7 +201,7 @@ if(VALGRIND_PROGRAM)
     add_custom_target(run_tests_memcheck
         COMMAND ${CMAKE_CTEST_COMMAND} --verbose --output-on-failure 
                 -T memcheck
-        DEPENDS test_matrix
+        DEPENDS test_matrix test_kalman test_extended_kalman
         COMMENT "Running tests with memory checking using Valgrind"
         VERBATIM
     )
@@ -133,6 +220,9 @@ if(KALMAN_ENABLE_COVERAGE)
         target_compile_options(test_matrix PRIVATE --coverage -fprofile-arcs -ftest-coverage)
         target_link_libraries(test_matrix PRIVATE --coverage)
         
+        target_compile_options(test_kalman PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+        target_link_libraries(test_kalman PRIVATE --coverage)
+        
         # Find gcov or llvm-cov
         find_program(GCOV_PROGRAM gcov)
         find_program(LLVM_COV_PROGRAM llvm-cov)
@@ -142,7 +232,7 @@ if(KALMAN_ENABLE_COVERAGE)
                 COMMAND ${CMAKE_CTEST_COMMAND} --quiet
                 COMMAND echo "Generating coverage report..."
                 WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-                DEPENDS test_matrix
+                DEPENDS test_matrix test_kalman
                 COMMENT "Generating code coverage report"
                 VERBATIM
             )

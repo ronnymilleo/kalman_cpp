@@ -37,6 +37,14 @@ kalman::kalman(const size_t stateDimension, const size_t measurementDimension, c
     : stateDim(stateDimension), measurementDim(measurementDimension),
       controlDim(controlDimension), initialized(false) {
 
+    // Validate dimensions
+    if (stateDimension == 0) {
+        throw std::invalid_argument("State dimension cannot be zero");
+    }
+    if (measurementDimension == 0) {
+        throw std::invalid_argument("Measurement dimension cannot be zero");
+    }
+
     // Initialize state vector
     state.resize(stateDim, 0.0);
 
@@ -220,7 +228,7 @@ std::vector<std::vector<double>>& kalman::getErrorCovariance() {
 }
 
 double kalman::getStateElement(const size_t index) const {
-    if (index < 0 || index >= stateDim) {
+    if (index >= stateDim) {
         throw std::out_of_range("State index out of range");
     }
     return state[index];

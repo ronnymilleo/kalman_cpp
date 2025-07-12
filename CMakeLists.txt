@@ -98,6 +98,8 @@ endif()
 add_library(kalman_lib STATIC
     kalman.cpp
     kalman.h
+    extended_kalman.cpp
+    extended_kalman.h
     matrix_math.cpp
     matrix_math.h
 )
@@ -132,7 +134,7 @@ target_include_directories(kalman_lib
 if(KALMAN_BUILD_EXAMPLES)
     # Main demonstration executable
     add_executable(kalman_demo
-        main.cpp
+        kalman_demo.cpp
     )
 
     # Link with the Kalman library
@@ -151,7 +153,31 @@ if(KALMAN_BUILD_EXAMPLES)
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF
-        OUTPUT_NAME "kalman"
+        OUTPUT_NAME "kalman_demo"
+    )
+    
+    # Extended Kalman Filter demonstration executable
+    add_executable(extended_kalman_demo
+        extended_kalman_demo.cpp
+    )
+
+    # Link with the Kalman library
+    target_link_libraries(extended_kalman_demo
+        PRIVATE
+            kalman_lib
+    )
+
+    # Apply compiler warnings to executable
+    if(KALMAN_ENABLE_WARNINGS)
+        target_compile_options(extended_kalman_demo PRIVATE ${KALMAN_WARNING_FLAGS})
+    endif()
+
+    # Set target properties
+    set_target_properties(extended_kalman_demo PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        OUTPUT_NAME "extended_kalman_demo"
     )
 endif()
 
@@ -180,6 +206,7 @@ install(TARGETS kalman_lib
 # Install header files
 install(FILES
     kalman.h
+    extended_kalman.h
     matrix_math.h
     DESTINATION include
 )
@@ -187,6 +214,9 @@ install(FILES
 # Install executable if built
 if(KALMAN_BUILD_EXAMPLES)
     install(TARGETS kalman_demo
+        DESTINATION bin
+    )
+    install(TARGETS extended_kalman_demo
         DESTINATION bin
     )
 endif()
