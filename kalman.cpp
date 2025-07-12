@@ -27,12 +27,13 @@
  */
 
 #include "kalman.h"
+#include <cstddef>
 #include <stdexcept>
 
 #include "matrix_math.h"
 
 // Constructor with dimensions
-kalman::kalman(const int stateDimension, const int measurementDimension, const int controlDimension)
+kalman::kalman(const size_t stateDimension, const size_t measurementDimension, const size_t controlDimension)
     : stateDim(stateDimension), measurementDim(measurementDimension),
       controlDim(controlDimension), initialized(false) {
 
@@ -120,7 +121,7 @@ void kalman::predict(const std::vector<double>& control) {
     // Predict state: x = F * x + B * u
     std::vector<double> result(stateDim);
     matrix_vector_multiply(stateTransition, state, result);
-    for (int i = 0; i < stateDim; i++) {
+    for (size_t i = 0; i < stateDim; i++) {
         state[i] = result[i];
     }
 
@@ -130,7 +131,7 @@ void kalman::predict(const std::vector<double>& control) {
         }
         std::vector<double> controlContribution(stateDim);
         matrix_vector_multiply(controlMatrix, control, controlContribution);
-        for (int i = 0; i < stateDim; i++) {
+        for (size_t i = 0; i < stateDim; i++) {
             state[i] += controlContribution[i];
         }
     }
@@ -161,7 +162,7 @@ void kalman::update(const std::vector<double>& measurement) {
     // Calculate innovation: y = z - H * x
     matrix_vector_multiply(observationMatrix, state, predictedMeasurement);
     std::vector<double> innovation(measurementDim);
-    for (int i = 0; i < measurementDim; i++) {
+    for (size_t i = 0; i < measurementDim; i++) {
         innovation[i] = measurement[i] - predictedMeasurement[i];
     }
 
@@ -189,7 +190,7 @@ void kalman::update(const std::vector<double>& measurement) {
 
     // Update state: x = x + K * y
     matrix_vector_multiply(K, innovation, Ky);
-    for (int i = 0; i < stateDim; i++) {
+    for (size_t i = 0; i < stateDim; i++) {
         state[i] += Ky[i];
     }
 
@@ -202,8 +203,8 @@ void kalman::update(const std::vector<double>& measurement) {
     matrix_subtract(identity, KH, IKH);
     matrix_multiply(IKH, errorCovariance, result);
 
-    for (int i = 0; i < stateDim; i++) {
-        for (int j = 0; j < stateDim; j++) {
+    for (size_t i = 0; i < stateDim; i++) {
+        for (size_t j = 0; j < stateDim; j++) {
             errorCovariance[i][j] = result[i][j];
         }
     }
@@ -218,7 +219,7 @@ std::vector<std::vector<double>>& kalman::getErrorCovariance() {
     return errorCovariance;
 }
 
-double kalman::getStateElement(const int index) const {
+double kalman::getStateElement(const size_t index) const {
     if (index < 0 || index >= stateDim) {
         throw std::out_of_range("State index out of range");
     }

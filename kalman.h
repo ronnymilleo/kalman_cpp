@@ -128,7 +128,7 @@ public:
      * @note Filter requires further initialization via setter methods
      * @note Identity matrix is pre-computed for efficiency
      */
-    kalman(int stateDimension, int measurementDimension, int controlDimension = 0);
+    kalman(size_t stateDimension, size_t measurementDimension, size_t controlDimension = 0);
     
     /**
      * @brief Destructor
@@ -318,7 +318,7 @@ public:
      * 
      * @note More efficient than accessing getState()[index]
      */
-    double getStateElement(int index) const;
+    double getStateElement(size_t index) const;
 
     /** @} */
 
