@@ -1,3 +1,5 @@
+[![CMake on multiple platforms](https://github.com/ronnymilleo/kalman_cpp/actions/workflows/cmake-multi-platform.yml/badge.svg?branch=main)](https://github.com/ronnymilleo/kalman_cpp/actions/workflows/cmake-multi-platform.yml)
+
 # Kalman Filter Implementation in C++
 
 This repository contains a modern C++ implementation of a Kalman filter for real-time state estimation.
