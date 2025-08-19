@@ -30,7 +30,7 @@
 #include <vector>
 #include <stdexcept>
 #include <cmath>
-#include "../kalman.h"
+#include "kalman.h"
 
 /**
  * @brief Test fixture for Kalman filter tests

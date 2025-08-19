@@ -1,55 +1,57 @@
-### C++ template
-# Prerequisites
-*.d
+# Build artifacts and directories
+build/
+debug/
+release/
+Debug/
+Release/
 
-# Compiled Object files
-*.slo
-*.lo
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+_deps/
+CMakeUserPresets.json
+
+# C/C++ compiled files
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
 *.a
 *.lib
-
-# Executables
+*.dll
+*.so
+*.so.*
+*.dylib
 *.exe
 *.out
 *.app
 
-### CMake template
-CMakeLists.txt.user
-CMakeCache.txt
-CMakeFiles
-CMakeScripts
-Testing
-Makefile
-cmake_install.cmake
-install_manifest.txt
-compile_commands.json
-CTestTestfile.cmake
-_deps
-CMakeUserPresets.json
+# Precompiled headers
+*.gch
+*.pch
 
-## Folders
-Release/
-Debug/
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+*.ilk
+*.map
+*.exp
+*.dwo
+
+# Dependencies
+*.d
+
+# Project specific
 .cache/
-build/
-lib/
-bin/
+.venv/
+compile_commands.json
+imgui.ini
+*.log
+*.tmp
+*.bak

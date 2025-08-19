@@ -25,7 +25,7 @@
  * @see kalman.cpp for usage examples
  */
 
-#include "matrix_math.h"
+#include "../include/matrix_math.h"
 #include <stdexcept>
 
 void matrix_add(const std::vector<std::vector<double>>& A,

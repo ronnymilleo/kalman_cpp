@@ -30,7 +30,7 @@
  */
 
 #include <gtest/gtest.h>
-#include "../extended_kalman.h"
+#include "extended_kalman.h"
 #include <cmath>
 
 class ExtendedKalmanTest : public ::testing::Test {

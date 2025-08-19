@@ -1,8 +1,7 @@
 # =============================================================================
-# Kalman Filter Implementation - Modern C++ Project
+# KalmanCpp
 # =============================================================================
-# A professional implementation of a Kalman filter for real-time state 
-# estimation with comprehensive matrix operations and exception-safe design.
+# Kalman filter implementation in C++
 #
 # Author: Ronny Milleo
 # License: See LICENSE file in project root
@@ -11,25 +10,30 @@
 cmake_minimum_required(VERSION 3.28)
 
 # Project definition with version and metadata
-project(KalmanFilter
-    VERSION 1.0.0
-    DESCRIPTION "Modern C++ Kalman Filter Implementation"
-    LANGUAGES CXX
+project(KalmanCpp
+    VERSION 0.1.0
+    DESCRIPTION "Kalman filter implementation in C++"
+    LANGUAGES CXX  # Change to C for C projects
 )
 
 # =============================================================================
-# Project Configuration
+# C++ Standard and Compiler Requirements
 # =============================================================================
 
-# Only allow in-source builds if explicitly requested
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR AND NOT DEFINED ENV{KALMAN_ALLOW_IN_SOURCE})
-    message(FATAL_ERROR 
-        "In-source builds are not allowed. Please create a separate build directory.\n"
-        "Usage: mkdir build && cd build && cmake ..\n"
-        "To override this behavior, set KALMAN_ALLOW_IN_SOURCE environment variable.")
-endif()
+# Require modern C++ standard
+set(CMAKE_CXX_STANDARD 23)  # Adjust as needed (17, 20, 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)  # Disable compiler-specific extensions
 
-# Set default build type to Release if not specified
+# For C projects, use:
+# set(CMAKE_C_STANDARD 99)  # or 11, 17, 23
+# set(CMAKE_C_STANDARD_REQUIRED ON)
+# set(CMAKE_C_EXTENSIONS OFF)
+
+# =============================================================================
+# Default Build Type
+# =============================================================================
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "Setting build type to 'Release' as none was specified.")
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
@@ -37,205 +41,152 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # =============================================================================
-# C++ Standard and Compiler Requirements
+# Project Options
 # =============================================================================
 
-# Require C++17 for modern features used in the implementation
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)  # Disable compiler-specific extensions
+option(KALMAN_CPP_BUILD_TESTS "Build unit tests" ON)
+option(KALMAN_CPP_BUILD_EXAMPLES "Build example programs" ON)
 
 # =============================================================================
-# Build Configuration Options
+# Compiler Configuration
 # =============================================================================
 
-# Project options
-option(KALMAN_BUILD_TESTS "Build unit tests" ON)
-option(KALMAN_BUILD_EXAMPLES "Build example programs" ON)
-option(KALMAN_ENABLE_WARNINGS "Enable compiler warnings" ON)
-option(KALMAN_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
-
-# =============================================================================
-# Compiler Flags and Warnings
-# =============================================================================
-
-# Enable compile commands export for IDE support
+# Enable compile commands export for IDE support (clangd, etc.)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set output directories for better organization
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/${CMAKE_BUILD_TYPE}/bin")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/${CMAKE_BUILD_TYPE}/lib")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/${CMAKE_BUILD_TYPE}/lib")
+string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_LOWER)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/${BUILD_TYPE_LOWER}/bin")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/${BUILD_TYPE_LOWER}/lib")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/${BUILD_TYPE_LOWER}/lib")
 
-# Compiler-specific warning flags
-if(KALMAN_ENABLE_WARNINGS)
-    if(MSVC)
-        set(KALMAN_WARNING_FLAGS /W4)
-        if(KALMAN_WARNINGS_AS_ERRORS)
-            list(APPEND KALMAN_WARNING_FLAGS /WX)
-        endif()
-    else()
-        set(KALMAN_WARNING_FLAGS 
-            -Wall -Wextra -Wpedantic
-            -Wcast-align -Wcast-qual -Wctor-dtor-privacy
-            -Wdisabled-optimization -Wformat=2 -Winit-self
-            -Wmissing-declarations -Wmissing-include-dirs
-            -Wold-style-cast -Woverloaded-virtual -Wredundant-decls
-            -Wshadow -Wsign-conversion -Wsign-promo
-            -Wstrict-overflow=5 -Wswitch-default -Wundef
-        )
-        if(KALMAN_WARNINGS_AS_ERRORS)
-            list(APPEND KALMAN_WARNING_FLAGS -Werror)
-        endif()
-    endif()
+# =============================================================================
+# Formatting Target (clang-format)
+# =============================================================================
+
+find_program(CLANG_FORMAT NAMES clang-format)
+if(CLANG_FORMAT)
+    # Collect all source files for formatting
+    file(GLOB_RECURSE ALL_SOURCE_FILES 
+        ${CMAKE_SOURCE_DIR}/application/*.cpp
+        ${CMAKE_SOURCE_DIR}/application/*.h
+        ${CMAKE_SOURCE_DIR}/library/src/*.cpp
+        ${CMAKE_SOURCE_DIR}/library/src/*.cc
+        ${CMAKE_SOURCE_DIR}/library/src/*.c
+        ${CMAKE_SOURCE_DIR}/library/include/*.h
+        ${CMAKE_SOURCE_DIR}/library/include/*.hpp
+        ${CMAKE_SOURCE_DIR}/tests/*.cpp
+        ${CMAKE_SOURCE_DIR}/tests/*.cc
+        ${CMAKE_SOURCE_DIR}/tests/*.c
+        ${CMAKE_SOURCE_DIR}/examples/*.cpp
+        ${CMAKE_SOURCE_DIR}/examples/*.cc
+        ${CMAKE_SOURCE_DIR}/examples/*.c
+    )
+    
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT} -i ${ALL_SOURCE_FILES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Formatting source code with clang-format"
+        VERBATIM
+    )
+else()
+    message(STATUS "clang-format not found; skipping automatic source formatting")
+    add_custom_target(format
+        COMMAND ${CMAKE_COMMAND} -E echo "clang-format not found, skipping formatting"
+    )
 endif()
+
+# =============================================================================
+# Dependencies
+# =============================================================================
+
+add_subdirectory(vendor)
 
 # =============================================================================
 # Main Library Target
 # =============================================================================
 
-# Create a library target for the Kalman filter implementation
-add_library(kalman_lib STATIC
-    kalman.cpp
-    kalman.h
-    extended_kalman.cpp
-    extended_kalman.h
-    matrix_math.cpp
-    matrix_math.h
-)
+add_subdirectory(library)
 
-# Set target properties
-set_target_properties(kalman_lib PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-)
+# =============================================================================
+# Main Executable Target (if applicable)
+# =============================================================================
 
-# Apply compiler warnings to library
-if(KALMAN_ENABLE_WARNINGS)
-    target_compile_options(kalman_lib PRIVATE ${KALMAN_WARNING_FLAGS})
+add_subdirectory(application)
+
+# Add Windows resource file for icon on Windows
+if(WIN32)
+    set(WINDOWS_RESOURCES ${CMAKE_SOURCE_DIR}/resources.rc)
+else()
+    set(WINDOWS_RESOURCES "")
 endif()
 
-# Configure include directories
-target_include_directories(kalman_lib
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-        $<INSTALL_INTERFACE:include>
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-)
+# add_executable(imkalmanfilter
+#     ${CMAKE_SOURCE_DIR}/main.cpp
+#     ${WINDOWS_RESOURCES}
+# )
+
+# target_include_directories(imkalmanfilter
+#     PRIVATE
+#         ${CMAKE_SOURCE_DIR}/application
+#         ${CMAKE_SOURCE_DIR}/library/include
+# )
+
+# target_link_libraries(imkalmanfilter 
+#     PRIVATE 
+#         app_gui
+# )
+
+# # Copy assets folder to output directory after build
+# add_custom_command(TARGET imkalmanfilter POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy_directory
+#     ${CMAKE_SOURCE_DIR}/assets
+#     $<TARGET_FILE_DIR:imkalmanfilter>/assets
+#     COMMENT "Copying assets to output directory"
+# )
 
 # =============================================================================
-# Main Executable Target
+# Examples
 # =============================================================================
 
-if(KALMAN_BUILD_EXAMPLES)
-    # Main demonstration executable
-    add_executable(kalman_demo
-        kalman_demo.cpp
-    )
-
-    # Link with the Kalman library
-    target_link_libraries(kalman_demo
-        PRIVATE
-            kalman_lib
-    )
-
-    # Apply compiler warnings to executable
-    if(KALMAN_ENABLE_WARNINGS)
-        target_compile_options(kalman_demo PRIVATE ${KALMAN_WARNING_FLAGS})
-    endif()
-
-    # Set target properties
-    set_target_properties(kalman_demo PROPERTIES
-        CXX_STANDARD 17
-        CXX_STANDARD_REQUIRED ON
-        CXX_EXTENSIONS OFF
-        OUTPUT_NAME "kalman_demo"
-    )
-    
-    # Extended Kalman Filter demonstration executable
-    add_executable(extended_kalman_demo
-        extended_kalman_demo.cpp
-    )
-
-    # Link with the Kalman library
-    target_link_libraries(extended_kalman_demo
-        PRIVATE
-            kalman_lib
-    )
-
-    # Apply compiler warnings to executable
-    if(KALMAN_ENABLE_WARNINGS)
-        target_compile_options(extended_kalman_demo PRIVATE ${KALMAN_WARNING_FLAGS})
-    endif()
-
-    # Set target properties
-    set_target_properties(extended_kalman_demo PROPERTIES
-        CXX_STANDARD 17
-        CXX_STANDARD_REQUIRED ON
-        CXX_EXTENSIONS OFF
-        OUTPUT_NAME "extended_kalman_demo"
-    )
+if(KALMAN_CPP_BUILD_EXAMPLES AND EXISTS ${CMAKE_SOURCE_DIR}/examples)
+    add_subdirectory(examples)
 endif()
 
 # =============================================================================
-# Testing Configuration
+# Testing
 # =============================================================================
 
-if(KALMAN_BUILD_TESTS)
-    enable_testing()
-    message(STATUS "Building tests enabled")
-    add_subdirectory(tests)
-endif()
+add_subdirectory(tests)
 
 # =============================================================================
-# Installation Configuration
+# Copy compile_commands.json to source dir (for clangd)
 # =============================================================================
 
-# Install library and headers
-install(TARGETS kalman_lib
-    EXPORT KalmanFilterTargets
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+add_custom_target(copy_compile_commands ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_BINARY_DIR}/compile_commands.json
+            ${CMAKE_SOURCE_DIR}/compile_commands.json
+    COMMENT "Copying compile_commands.json to source dir for clangd"
+    DEPENDS ${CMAKE_BINARY_DIR}/compile_commands.json
 )
-
-# Install header files
-install(FILES
-    kalman.h
-    extended_kalman.h
-    matrix_math.h
-    DESTINATION include
-)
-
-# Install executable if built
-if(KALMAN_BUILD_EXAMPLES)
-    install(TARGETS kalman_demo
-        DESTINATION bin
-    )
-    install(TARGETS extended_kalman_demo
-        DESTINATION bin
-    )
-endif()
 
 # =============================================================================
 # Project Summary
 # =============================================================================
 
 message(STATUS "")
-message(STATUS "=== Kalman Filter Project Configuration ===")
+message(STATUS "=== KalmanCpp Configuration ===")
 message(STATUS "Project:              ${PROJECT_NAME}")
 message(STATUS "Version:              ${PROJECT_VERSION}")
 message(STATUS "Build type:           ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ standard:         ${CMAKE_CXX_STANDARD}")
 message(STATUS "Compiler:             ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "Build tests:          ${KALMAN_BUILD_TESTS}")
-message(STATUS "Build examples:       ${KALMAN_BUILD_EXAMPLES}")
-message(STATUS "Enable warnings:      ${KALMAN_ENABLE_WARNINGS}")
-message(STATUS "Warnings as errors:   ${KALMAN_WARNINGS_AS_ERRORS}")
-message(STATUS "Install prefix:       ${CMAKE_INSTALL_PREFIX}")
-message(STATUS "============================================")
+message(STATUS "Build tests:          ${KALMAN_CPP_BUILD_TESTS}")
+message(STATUS "Build examples:       ${KALMAN_CPP_BUILD_EXAMPLES}")
+message(STATUS "=========================================")
 message(STATUS "")
+
+# =============================================================================
+# End of file
+# =============================================================================

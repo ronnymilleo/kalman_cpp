@@ -12,17 +12,6 @@
 # =============================================================================
 
 # =============================================================================
-# Test Configuration
-# =============================================================================
-
-# Test project should not redefine C++ standard if parent project already set it
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 17)
-    set(CMAKE_CXX_STANDARD_REQUIRED ON)
-    set(CMAKE_CXX_EXTENSIONS OFF)
-endif()
-
-# =============================================================================
 # Google Test Framework Setup
 # =============================================================================
 
@@ -57,7 +46,7 @@ add_executable(test_matrix
 # Link test executable with the main library and Google Test
 target_link_libraries(test_matrix
     PRIVATE
-        kalman_lib          # Link with main library target
+        kalman          # Link with main library target
         GTest::gtest
         GTest::gtest_main
 )
@@ -65,7 +54,7 @@ target_link_libraries(test_matrix
 # Configure include directories for tests
 target_include_directories(test_matrix
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../  # Access to source headers
+        ${CMAKE_SOURCE_DIR}/library/include
 )
 
 # Set test executable properties
@@ -89,7 +78,7 @@ add_executable(test_kalman
 # Link test executable with the main library and Google Test
 target_link_libraries(test_kalman
     PRIVATE
-        kalman_lib          # Link with main library target
+        kalman          # Link with main library target
         GTest::gtest
         GTest::gtest_main
 )
@@ -97,7 +86,7 @@ target_link_libraries(test_kalman
 # Configure include directories for tests
 target_include_directories(test_kalman
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../  # Access to source headers
+        ${CMAKE_SOURCE_DIR}/library/include
 )
 
 # Set test executable properties
@@ -121,7 +110,7 @@ add_executable(test_extended_kalman
 # Link test executable with the main library and Google Test
 target_link_libraries(test_extended_kalman
     PRIVATE
-        kalman_lib          # Link with main library target
+        extended_kalman          # Link with main library target
         GTest::gtest
         GTest::gtest_main
 )
@@ -129,7 +118,7 @@ target_link_libraries(test_extended_kalman
 # Configure include directories for tests
 target_include_directories(test_extended_kalman
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../  # Access to source headers
+        ${CMAKE_SOURCE_DIR}/library/include
 )
 
 # Set test executable properties
