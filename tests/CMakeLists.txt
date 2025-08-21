@@ -12,29 +12,6 @@
 # =============================================================================
 
 # =============================================================================
-# Google Test Framework Setup
-# =============================================================================
-
-include(FetchContent)
-
-# Configure Google Test with specific version for reproducible builds
-FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.17.0
-    GIT_SHALLOW TRUE
-    FIND_PACKAGE_ARGS NAMES GTest
-)
-
-# Set Google Test options before making it available
-set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-# Make Google Test available
-FetchContent_MakeAvailable(googletest)
-
-# =============================================================================
 # Test Executables
 # =============================================================================
 
@@ -57,19 +34,6 @@ target_include_directories(test_matrix
         ${CMAKE_SOURCE_DIR}/library/include
 )
 
-# Set test executable properties
-set_target_properties(test_matrix PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-    FOLDER "Tests"
-)
-
-# Apply same warning flags as main project if enabled
-if(KALMAN_ENABLE_WARNINGS AND DEFINED KALMAN_WARNING_FLAGS)
-    target_compile_options(test_matrix PRIVATE ${KALMAN_WARNING_FLAGS})
-endif()
-
 # Standard Kalman Filter test suite
 add_executable(test_kalman
     test_kalman.cpp
@@ -89,19 +53,6 @@ target_include_directories(test_kalman
         ${CMAKE_SOURCE_DIR}/library/include
 )
 
-# Set test executable properties
-set_target_properties(test_kalman PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-    FOLDER "Tests"
-)
-
-# Apply same warning flags as main project if enabled
-if(KALMAN_ENABLE_WARNINGS AND DEFINED KALMAN_WARNING_FLAGS)
-    target_compile_options(test_kalman PRIVATE ${KALMAN_WARNING_FLAGS})
-endif()
-
 # Extended Kalman Filter test suite
 add_executable(test_extended_kalman
     test_extended_kalman.cpp
@@ -120,19 +71,6 @@ target_include_directories(test_extended_kalman
     PRIVATE
         ${CMAKE_SOURCE_DIR}/library/include
 )
-
-# Set test executable properties
-set_target_properties(test_extended_kalman PROPERTIES
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-    FOLDER "Tests"
-)
-
-# Apply same warning flags as main project if enabled
-if(KALMAN_ENABLE_WARNINGS AND DEFINED KALMAN_WARNING_FLAGS)
-    target_compile_options(test_extended_kalman PRIVATE ${KALMAN_WARNING_FLAGS})
-endif()
 
 # =============================================================================
 # Test Discovery and Registration
@@ -198,41 +136,6 @@ if(VALGRIND_PROGRAM)
 endif()
 
 # =============================================================================
-# Test Coverage Configuration (Optional)
-# =============================================================================
-
-option(KALMAN_ENABLE_COVERAGE "Enable code coverage analysis" OFF)
-
-if(KALMAN_ENABLE_COVERAGE)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        # Add coverage flags
-        target_compile_options(test_matrix PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        target_link_libraries(test_matrix PRIVATE --coverage)
-        
-        target_compile_options(test_kalman PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        target_link_libraries(test_kalman PRIVATE --coverage)
-        
-        # Find gcov or llvm-cov
-        find_program(GCOV_PROGRAM gcov)
-        find_program(LLVM_COV_PROGRAM llvm-cov)
-        
-        if(GCOV_PROGRAM OR LLVM_COV_PROGRAM)
-            add_custom_target(coverage
-                COMMAND ${CMAKE_CTEST_COMMAND} --quiet
-                COMMAND echo "Generating coverage report..."
-                WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-                DEPENDS test_matrix test_kalman
-                COMMENT "Generating code coverage report"
-                VERBATIM
-            )
-            message(STATUS "Code coverage target 'coverage' available")
-        endif()
-    else()
-        message(WARNING "Code coverage is only supported with GCC or Clang")
-    endif()
-endif()
-
-# =============================================================================
 # Test Configuration Summary
 # =============================================================================
 
@@ -248,4 +151,3 @@ endif()
 message(STATUS "Test timeout:         30 seconds")
 message(STATUS "===================================")
 message(STATUS "")
-

@@ -2,3 +2,4 @@
 # Third-party dependencies
 # =============================================================================
 
+add_subdirectory(googletest)

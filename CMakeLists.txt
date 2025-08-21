@@ -157,7 +157,10 @@ endif()
 # Testing
 # =============================================================================
 
-add_subdirectory(tests)
+if(KALMAN_CPP_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 # =============================================================================
 # Copy compile_commands.json to source dir (for clangd)
