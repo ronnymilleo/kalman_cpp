@@ -1,5 +1,9 @@
 # KalmanCpp
 
+[![CI](https://github.com/ronnymilleo/kalman_cpp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ronnymilleo/kalman_cpp/actions/workflows/ci.yml)
+[![Coverage Status](https://coveralls.io/repos/github/ronnymilleo/kalman_cpp/badge.svg?branch=main)](https://coveralls.io/github/ronnymilleo/kalman_cpp?branch=main)
+[![CodeFactor](https://www.codefactor.io/repository/github/ronnymilleo/kalman_cpp/badge)](https://www.codefactor.io/repository/github/ronnymilleo/kalman_cpp)
+
 Kalman and Extended Kalman filters in C++17, for real-time state estimation.
 
 ## Features
