@@ -6,9 +6,12 @@
 #ifndef KALMAN_CPP_DEMO_SUPPORT_H
 #define KALMAN_CPP_DEMO_SUPPORT_H
 
+#include "core/result.h"
+
+#include <cstddef>
 #include <cstdint>
-#include <expected>
 #include <random>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -39,10 +42,39 @@ private:
     std::mt19937 m_Generator;
 };
 
+// Text
+void ApplyFormatSpec(std::ostream &stream, const std::string &spec);
+
+/**
+ * @brief   Writes values into a template, like std::format does in C++20, which this C++17 project does not have.
+ * @details Each `{}` takes the next argument. A `{:W}` pads it to a width of W characters, `{:.Pf}` writes a number
+ * with P decimals and `{:W.Pf}` does both.
+ * @param[in] format  Template text with one `{...}` for each argument.
+ * @param[in] args    Values to write, anything a stream can write.
+ * @return  The text with the values in place.
+ */
+template <typename... Args> std::string Format(const std::string &format, const Args &...args) {
+    std::ostringstream stream;
+    std::size_t position = 0;
+    const auto write_next = [&](const auto &value) {
+        const std::size_t open = format.find('{', position);
+        const std::size_t close = format.find('}', open);
+        stream << format.substr(position, open - position);
+        std::ostringstream field;
+        ApplyFormatSpec(field, format.substr(open + 1, close - open - 1));
+        field << value;
+        stream << field.str();
+        position = close + 1;
+    };
+    (write_next(args), ...);
+    stream << format.substr(position);
+    return stream.str();
+}
+
 // Checks
 double RootMeanSquare(const std::vector<double> &errors);
-[[nodiscard]] std::expected<void, std::string> CheckImprovement(std::string_view what, double filtered_error,
-                                                                double raw_error, double required_share);
+[[nodiscard]] Core::Result<void> CheckImprovement(std::string_view what, double filtered_error, double raw_error,
+                                                  double required_share);
 
 } // namespace Demo
 

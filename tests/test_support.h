@@ -10,11 +10,12 @@
 #include "matrix/matrix.h"
 
 #include <cstdint>
-#include <expected>
 #include <gtest/gtest.h>
 #include <ostream>
 #include <random>
+#include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace Core {
 
@@ -64,11 +65,35 @@ struct Model {
  * @param[in] outcome  Result of an operation of the library.
  * @return  Success when the operation succeeded, otherwise a failure carrying the message.
  */
-template <typename T>::testing::AssertionResult Succeeded(const std::expected<T, std::string> &outcome) {
+template <typename T>::testing::AssertionResult Succeeded(const Core::Result<T> &outcome) {
     if (outcome) {
         return ::testing::AssertionSuccess();
     }
-    return ::testing::AssertionFailure() << outcome.error();
+    return ::testing::AssertionFailure() << outcome.Error();
+}
+
+/**
+ * @brief   Takes the value out of the outcome of an operation that has to succeed for the test to make sense.
+ * @details A failure throws, which GoogleTest reports as a failed test with the message. Exceptions are fine here: this
+ *          is the boundary between the library, which never throws, and the framework.
+ * @param[in] outcome  Result of an operation of the library.
+ * @return  The value of the outcome.
+ */
+template <typename T> T Must(Core::Result<T> outcome) {
+    if (!outcome) {
+        throw std::runtime_error(outcome.Error());
+    }
+    return std::move(*outcome);
+}
+
+/**
+ * @brief   Requires an operation that returns nothing to succeed; a failure throws, see the other overload.
+ * @param[in] outcome  Result of an operation of the library.
+ */
+inline void Must(const Core::Result<void> &outcome) {
+    if (!outcome) {
+        throw std::runtime_error(outcome.Error());
+    }
 }
 
 // Models

@@ -3,6 +3,8 @@
 # =============================================================================
 
 add_library(kalman-cpp-core-lib STATIC
+    core/result.h
+    core/text.h
     filters/extended_kalman_filter.cpp
     filters/extended_kalman_filter.h
     filters/kalman_filter.cpp

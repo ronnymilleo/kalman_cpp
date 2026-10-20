@@ -46,11 +46,11 @@ Core::Matrix DistanceFromOriginJacobian(const Core::Vector &state) {
 // Two states and one measurement, identity covariance, and process and measurement noise as given
 Core::ExtendedKalmanFilter StartedFilter(const Core::Vector &initial_state, const double process_noise,
                                          const double measurement_noise) {
-    Core::ExtendedKalmanFilter filter = Core::ExtendedKalmanFilter::Create(2, 1, 1).value();
-    filter.InitializeState(initial_state).value();
-    filter.SetProcessNoiseCovariance({{process_noise, 0.0}, {0.0, process_noise}}).value();
-    filter.SetMeasurementNoiseCovariance({{measurement_noise}}).value();
-    filter.SetErrorCovariance(Core::Matrix::Identity(2)).value();
+    Core::ExtendedKalmanFilter filter = Tests::Must(Core::ExtendedKalmanFilter::Create(2, 1, 1));
+    Tests::Must(filter.InitializeState(initial_state));
+    Tests::Must(filter.SetProcessNoiseCovariance({{process_noise, 0.0}, {0.0, process_noise}}));
+    Tests::Must(filter.SetMeasurementNoiseCovariance({{measurement_noise}}));
+    Tests::Must(filter.SetErrorCovariance(Core::Matrix::Identity(2)));
     return filter;
 }
 
@@ -73,7 +73,7 @@ TEST(ExtendedKalmanFilter, AFilterNeedsAtLeastOneStateAndOneMeasurement) {
 }
 
 TEST(ExtendedKalmanFilter, ModelFunctionsCannotBeEmpty) {
-    Core::ExtendedKalmanFilter filter = Core::ExtendedKalmanFilter::Create(2, 1).value();
+    Core::ExtendedKalmanFilter filter = Tests::Must(Core::ExtendedKalmanFilter::Create(2, 1));
 
     EXPECT_FALSE(filter.SetStateTransitionFunction(nullptr));
     EXPECT_FALSE(filter.SetObservationFunction(nullptr));
@@ -82,7 +82,7 @@ TEST(ExtendedKalmanFilter, ModelFunctionsCannotBeEmpty) {
 }
 
 TEST(ExtendedKalmanFilter, TheModelIsCompleteOnlyOnceAllFourFunctionsAreSet) {
-    Core::ExtendedKalmanFilter filter = Core::ExtendedKalmanFilter::Create(2, 1).value();
+    Core::ExtendedKalmanFilter filter = Tests::Must(Core::ExtendedKalmanFilter::Create(2, 1));
     EXPECT_FALSE(filter.AreAllFunctionsSet());
 
     SetSquareFirstState(filter);
@@ -92,7 +92,7 @@ TEST(ExtendedKalmanFilter, TheModelIsCompleteOnlyOnceAllFourFunctionsAreSet) {
 }
 
 TEST(ExtendedKalmanFilter, MatricesOfTheWrongShapeAreRejected) {
-    Core::ExtendedKalmanFilter filter = Core::ExtendedKalmanFilter::Create(2, 1).value();
+    Core::ExtendedKalmanFilter filter = Tests::Must(Core::ExtendedKalmanFilter::Create(2, 1));
     const Core::Matrix wrong = Core::Matrix::Identity(3);
 
     EXPECT_FALSE(filter.SetProcessNoiseCovariance(wrong));
@@ -102,7 +102,7 @@ TEST(ExtendedKalmanFilter, MatricesOfTheWrongShapeAreRejected) {
 }
 
 TEST(ExtendedKalmanFilter, TheFilterCannotPredictOrUpdateBeforeItIsReady) {
-    Core::ExtendedKalmanFilter filter = Core::ExtendedKalmanFilter::Create(2, 1).value();
+    Core::ExtendedKalmanFilter filter = Tests::Must(Core::ExtendedKalmanFilter::Create(2, 1));
     SetSquareFirstState(filter);
     SetDistanceFromOrigin(filter);
 
@@ -224,7 +224,7 @@ TEST(ExtendedKalmanFilter, ResettingClearsTheEstimateButKeepsTheFunctions) {
 
 TEST(ExtendedKalmanFilter, TheFilterTracksAnObjectFromMeasurementsOfItsSquaredPosition) {
     // The object moves along a line at 1 unit per step, and the sensor reports the square of its position
-    Core::ExtendedKalmanFilter filter = Core::ExtendedKalmanFilter::Create(2, 1).value();
+    Core::ExtendedKalmanFilter filter = Tests::Must(Core::ExtendedKalmanFilter::Create(2, 1));
     ASSERT_TRUE(Tests::Succeeded(
         filter.SetStateTransitionFunction([](const Core::Vector &state, const Core::Vector & /*control*/) {
             return Core::Vector{state[0] + state[1], state[1]};

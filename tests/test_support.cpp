@@ -110,12 +110,12 @@ double NoiseSource::Symmetric(const double amplitude) {
  * @return  The model.
  */
 Model PositionVelocityModel(const double dt, const double measurement_variance, const double initial_variance) {
-    return {.F = {{1.0, dt}, {0.0, 1.0}},
-            .H = {{1.0, 0.0}},
-            .Q = {{0.01, 0.0}, {0.0, 0.01}},
-            .R = {{measurement_variance}},
-            .P = {{initial_variance, 0.0}, {0.0, initial_variance}},
-            .InitialState = {0.0, 0.0}};
+    return {{{1.0, dt}, {0.0, 1.0}},
+            {{1.0, 0.0}},
+            {{0.01, 0.0}, {0.0, 0.01}},
+            {{measurement_variance}},
+            {{initial_variance, 0.0}, {0.0, initial_variance}},
+            {0.0, 0.0}};
 }
 
 /**
@@ -131,23 +131,23 @@ Model PlanarPositionVelocityModel(const double dt, const double process_variance
                                   const double initial_variance) {
     const double q = process_variance;
     // clang-format off
-    return {.F = {{1.0, 0.0, dt,  0.0},
+    return {{{1.0, 0.0, dt,  0.0},
                   {0.0, 1.0, 0.0, dt },
                   {0.0, 0.0, 1.0, 0.0},
                   {0.0, 0.0, 0.0, 1.0}},
-            .H = {{1.0, 0.0, 0.0, 0.0},
+            {{1.0, 0.0, 0.0, 0.0},
                   {0.0, 1.0, 0.0, 0.0}},
-            .Q = {{q * dt * dt, 0.0,          q * dt, 0.0   },
+            {{q * dt * dt, 0.0,          q * dt, 0.0   },
                   {0.0,         q * dt * dt,  0.0,    q * dt},
                   {q * dt,      0.0,          q,      0.0   },
                   {0.0,         q * dt,       0.0,    q     }},
-            .R = {{measurement_variance, 0.0},
+            {{measurement_variance, 0.0},
                   {0.0, measurement_variance}},
-            .P = {{initial_variance, 0.0, 0.0, 0.0},
+            {{initial_variance, 0.0, 0.0, 0.0},
                   {0.0, initial_variance, 0.0, 0.0},
                   {0.0, 0.0, initial_variance, 0.0},
                   {0.0, 0.0, 0.0, initial_variance}},
-            .InitialState = {0.0, 0.0, 0.0, 0.0}};
+            {0.0, 0.0, 0.0, 0.0}};
     // clang-format on
 }
 
@@ -169,13 +169,13 @@ Core::Matrix PositionVelocityNoise(const double dt, const double process_noise_s
  * @return  The filter.
  */
 Core::KalmanFilter StartedFilter(const Model &model) {
-    Core::KalmanFilter filter = Core::KalmanFilter::Create(model.F.GetRows(), model.H.GetRows()).value();
-    filter.InitializeState(model.InitialState).value();
-    filter.SetStateTransitionMatrix(model.F).value();
-    filter.SetObservationMatrix(model.H).value();
-    filter.SetProcessNoiseCovariance(model.Q).value();
-    filter.SetMeasurementNoiseCovariance(model.R).value();
-    filter.SetErrorCovariance(model.P).value();
+    Core::KalmanFilter filter = Must(Core::KalmanFilter::Create(model.F.GetRows(), model.H.GetRows()));
+    Must(filter.InitializeState(model.InitialState));
+    Must(filter.SetStateTransitionMatrix(model.F));
+    Must(filter.SetObservationMatrix(model.H));
+    Must(filter.SetProcessNoiseCovariance(model.Q));
+    Must(filter.SetMeasurementNoiseCovariance(model.R));
+    Must(filter.SetErrorCovariance(model.P));
     return filter;
 }
 

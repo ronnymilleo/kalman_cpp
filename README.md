@@ -1,13 +1,11 @@
-[![CI](https://github.com/ronnymilleo/kalman_cpp/actions/workflows/cmake-multi-platform.yml/badge.svg?branch=main)](https://github.com/ronnymilleo/kalman_cpp/actions/workflows/cmake-multi-platform.yml)
-
 # KalmanCpp
 
-Kalman and Extended Kalman filters in C++23, for real-time state estimation.
+Kalman and Extended Kalman filters in C++17, for real-time state estimation.
 
 ## Features
 
 - **Kalman filter** for linear systems and **Extended Kalman filter** for non-linear ones, with optional control input.
-- **No exceptions**: operations that can fail return `std::expected<T, std::string>` with a message that says what was
+- **No exceptions**: operations that can fail return a `Core::Result<T>` (a value, or a message) that says what was
   wrong, and a filter is left unchanged when an operation fails.
 - **`Core::Matrix`**: a dense row-major matrix with the arithmetic the filters need (`+`, `-`, `*`, transpose and
   inverse), so the filter equations read like the textbook.
@@ -27,8 +25,7 @@ Kalman and Extended Kalman filters in C++23, for real-time state estimation.
 
 ## Building
 
-You need CMake 3.28 or newer, Ninja and a compiler with C++23 support for `std::expected` and `std::format` (GCC 13+,
-Clang 17+, a current Visual Studio 2022).
+You need CMake 3.28 or newer, Ninja and a C++17 compiler (GCC, Clang or MSVC).
 
 ```bash
 # GoogleTest is only needed for the tests
@@ -56,7 +53,7 @@ ctest --test-dir build --output-on-failure
 | `KALMAN_CPP_BUILD_EXAMPLES`    | `ON`    | Build the demonstration programs                   |
 | `KALMAN_CPP_WARNINGS_AS_ERRORS`| `OFF`   | Make warnings in the project's code fail the build |
 | `KALMAN_CPP_ENABLE_SANITIZERS` | `OFF`   | AddressSanitizer and UndefinedBehaviorSanitizer    |
-| `KALMAN_CPP_ENABLE_COVERAGE`   | `OFF`   | Instrument the code for `gcov`/`llvm-cov`          |
+| `KALMAN_CPP_ENABLE_COVERAGE`   | `OFF`   | Instrument the library for `gcov` (GCC or Clang)   |
 
 Building also runs `clang-format` over the sources when it is installed, through the `format` target.
 
@@ -73,22 +70,22 @@ Headers are included relative to `library/`, such as `#include "filters/kalman_f
 // Track position and velocity from position measurements
 constexpr double TimeStep = 0.1;
 
-std::expected<Core::KalmanFilter, std::string> created = Core::KalmanFilter::Create(2, 1);
+Core::Result<Core::KalmanFilter> created = Core::KalmanFilter::Create(2, 1);
 if (!created) {
-    return created.error();
+    return created.Error();
 }
 Core::KalmanFilter &filter = *created;
 
-// Each setter returns a message when it fails; and_then stops at the first one
-const std::expected<void, std::string> configured =
+// Each setter returns a message when it fails; AndThen stops at the first one
+const Core::Result<void> configured =
     filter.InitializeState({0.0, 0.0})
-        .and_then([&] { return filter.SetStateTransitionMatrix({{1.0, TimeStep}, {0.0, 1.0}}); })
-        .and_then([&] { return filter.SetObservationMatrix({{1.0, 0.0}}); })
-        .and_then([&] { return filter.SetProcessNoiseCovariance({{0.01, 0.0}, {0.0, 0.01}}); })
-        .and_then([&] { return filter.SetMeasurementNoiseCovariance({{0.25}}); })
-        .and_then([&] { return filter.SetErrorCovariance({{1.0, 0.0}, {0.0, 1.0}}); }); // ready once P is set
+        .AndThen([&] { return filter.SetStateTransitionMatrix({{1.0, TimeStep}, {0.0, 1.0}}); })
+        .AndThen([&] { return filter.SetObservationMatrix({{1.0, 0.0}}); })
+        .AndThen([&] { return filter.SetProcessNoiseCovariance({{0.01, 0.0}, {0.0, 0.01}}); })
+        .AndThen([&] { return filter.SetMeasurementNoiseCovariance({{0.25}}); })
+        .AndThen([&] { return filter.SetErrorCovariance({{1.0, 0.0}, {0.0, 1.0}}); }); // ready once P is set
 if (!configured) {
-    return configured.error();
+    return configured.Error();
 }
 
 if (filter.Predict() && filter.Update({1.2})) {
@@ -99,30 +96,37 @@ if (filter.Predict() && filter.Update({1.2})) {
 
 ### Extended filter
 
-The model is given as functions, together with their Jacobians:
+The model is given as functions, together with their Jacobians. The setters return a `Core::Result<void>`; check them as
+in the example above.
 
 ```cpp
 #include "filters/extended_kalman_filter.h"
 
-Core::ExtendedKalmanFilter filter = Core::ExtendedKalmanFilter::Create(2, 1).value();
+Core::Result<Core::ExtendedKalmanFilter> created = Core::ExtendedKalmanFilter::Create(2, 1);
+Core::ExtendedKalmanFilter &filter = *created; // after checking `created`, as above
 
-filter.SetStateTransitionFunction([](const Core::Vector &state, const Core::Vector & /*control*/) {
-    return Core::Vector{state[0] + state[1], state[1]};
-}).value();
-filter.SetStateJacobianFunction([](const Core::Vector & /*state*/) {
-    return Core::Matrix{{1.0, 1.0}, {0.0, 1.0}};
-}).value();
-filter.SetObservationFunction([](const Core::Vector &state) {
-    return Core::Vector{std::hypot(state[0], state[1])};
-}).value();
-filter.SetObservationJacobianFunction([](const Core::Vector &state) {
-    const double range = std::hypot(state[0], state[1]);
-    return Core::Matrix{{state[0] / range, state[1] / range}};
-}).value();
+const Core::Result<void> configured =
+    filter
+        .SetStateTransitionFunction([](const Core::Vector &state, const Core::Vector & /*control*/) {
+            return Core::Vector{state[0] + state[1], state[1]};
+        })
+        .AndThen([&] {
+            return filter.SetStateJacobianFunction(
+                [](const Core::Vector & /*state*/) { return Core::Matrix{{1.0, 1.0}, {0.0, 1.0}}; });
+        })
+        .AndThen([&] {
+            return filter.SetObservationFunction(
+                [](const Core::Vector &state) { return Core::Vector{std::hypot(state[0], state[1])}; });
+        })
+        .AndThen([&] {
+            return filter.SetObservationJacobianFunction([](const Core::Vector &state) {
+                const double range = std::hypot(state[0], state[1]);
+                return Core::Matrix{{state[0] / range, state[1] / range}};
+            });
+        });
 ```
 
-`.value()` is shorthand here; check the results as in the example above in real code. `Predict()` and `Update()` fail
-with a message until the four functions and the error covariance are set.
+`Predict()` and `Update()` fail with a message until the four functions and the error covariance are set.
 
 ## Mathematical background
 

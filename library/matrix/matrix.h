@@ -6,8 +6,9 @@
 #ifndef KALMAN_CPP_MATRIX_H
 #define KALMAN_CPP_MATRIX_H
 
+#include "core/result.h"
+
 #include <cstddef>
-#include <expected>
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -47,9 +48,10 @@ public:
 
     // Transforms
     Matrix Transposed() const;
-    [[nodiscard]] std::expected<Matrix, std::string> Inverse() const;
+    [[nodiscard]] Result<Matrix> Inverse() const;
 
-    bool operator==(const Matrix &) const = default;
+    bool operator==(const Matrix &other) const;
+    bool operator!=(const Matrix &other) const;
 
 private:
     std::size_t m_Rows = 0;

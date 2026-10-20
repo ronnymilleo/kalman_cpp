@@ -5,10 +5,11 @@
 
 #include "matrix.h"
 
+#include "core/text.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <format>
 #include <utility>
 
 namespace Core {
@@ -148,10 +149,9 @@ Matrix Matrix::Transposed() const {
  * @brief   Inverts the matrix by Gauss-Jordan elimination with partial pivoting.
  * @return  The inverse, or a message saying why there is none: the matrix is not square, or it is singular.
  */
-std::expected<Matrix, std::string> Matrix::Inverse() const {
+Result<Matrix> Matrix::Inverse() const {
     if (!IsSquare() || IsEmpty()) {
-        return std::unexpected(
-            std::format("Only a non-empty square matrix can be inverted, not {}x{}", m_Rows, m_Cols));
+        return Failure{Concat("Only a non-empty square matrix can be inverted, not ", m_Rows, "x", m_Cols)};
     }
 
     const std::size_t size = m_Rows;
@@ -174,7 +174,7 @@ std::expected<Matrix, std::string> Matrix::Inverse() const {
             }
         }
         if (std::abs(augmented(pivot_row, pivot_index)) <= tolerance) {
-            return std::unexpected("The matrix is singular and has no inverse");
+            return Failure{"The matrix is singular and has no inverse"};
         }
         if (pivot_row != pivot_index) {
             for (std::size_t col = 0; col < 2 * size; col++) {
@@ -204,6 +204,24 @@ std::expected<Matrix, std::string> Matrix::Inverse() const {
         }
     }
     return inverse;
+}
+
+/**
+ * @brief   Compares two matrices element by element.
+ * @param[in] other  Matrix to compare with.
+ * @return  True when both have the same shape and exactly the same elements.
+ */
+bool Matrix::operator==(const Matrix &other) const {
+    return m_Rows == other.m_Rows && m_Cols == other.m_Cols && m_Data == other.m_Data;
+}
+
+/**
+ * @brief   Tells whether two matrices differ in shape or in any element.
+ * @param[in] other  Matrix to compare with.
+ * @return  True when the matrices are not equal.
+ */
+bool Matrix::operator!=(const Matrix &other) const {
+    return !(*this == other);
 }
 
 /**

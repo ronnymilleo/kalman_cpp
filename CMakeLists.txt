@@ -24,8 +24,8 @@ endif()
 # C++ Standard and Compiler Requirements
 # =============================================================================
 
-# The code uses C++23 features: std::expected and std::format
-set(CMAKE_CXX_STANDARD 23)
+# The code needs C++17 only: structured bindings, std::optional, std::variant and fold expressions
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -104,6 +104,8 @@ set(KALMAN_CPP_FORMAT_SOURCES
     ${CMAKE_SOURCE_DIR}/examples/demo_support.h
     ${CMAKE_SOURCE_DIR}/examples/extended_kalman_demo.cpp
     ${CMAKE_SOURCE_DIR}/examples/kalman_demo.cpp
+    ${CMAKE_SOURCE_DIR}/library/core/result.h
+    ${CMAKE_SOURCE_DIR}/library/core/text.h
     ${CMAKE_SOURCE_DIR}/library/filters/extended_kalman_filter.cpp
     ${CMAKE_SOURCE_DIR}/library/filters/extended_kalman_filter.h
     ${CMAKE_SOURCE_DIR}/library/filters/kalman_filter.cpp

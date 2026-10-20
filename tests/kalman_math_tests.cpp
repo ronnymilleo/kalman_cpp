@@ -20,10 +20,10 @@ TEST(KalmanMath, ACheckPassesWhenTheShapeMatches) {
 }
 
 TEST(KalmanMath, ACheckNamesTheMatrixAndBothShapesWhenTheyDiffer) {
-    const std::expected<void, std::string> outcome = Core::CheckShape("The matrix", Core::Matrix(2, 3), 3, 3);
+    const Core::Result<void> outcome = Core::CheckShape("The matrix", Core::Matrix(2, 3), 3, 3);
 
     ASSERT_FALSE(outcome);
-    EXPECT_EQ(outcome.error(), "The matrix must be 3x3, not 2x3");
+    EXPECT_EQ(outcome.Error(), "The matrix must be 3x3, not 2x3");
 }
 
 TEST(KalmanMath, ThePredictedCovarianceIsFPFTransposedPlusQ) {
@@ -36,9 +36,9 @@ TEST(KalmanMath, ThePredictedCovarianceIsFPFTransposedPlusQ) {
 }
 
 TEST(KalmanMath, CorrectingWithEqualTrustLandsHalfwayToTheMeasurement) {
-    const Core::Estimate prior{.State = {0.0}, .Covariance = {{1.0}}};
+    const Core::Estimate prior{{0.0}, {{1.0}}};
 
-    const std::expected<Core::Estimate, std::string> corrected =
+    const Core::Result<Core::Estimate> corrected =
         Core::CorrectEstimate(prior, Core::Matrix({{1.0}}), Core::Matrix({{1.0}}), {2.0});
 
     // With P = R = 1 the gain is P / (P + R) = 0.5, so the estimate moves from 0 to 1 and the variance halves
@@ -48,9 +48,9 @@ TEST(KalmanMath, CorrectingWithEqualTrustLandsHalfwayToTheMeasurement) {
 }
 
 TEST(KalmanMath, CorrectingWithoutAnyUncertaintyFailsBecauseTheInnovationCovarianceIsSingular) {
-    const Core::Estimate prior{.State = {0.0}, .Covariance = {{0.0}}};
+    const Core::Estimate prior{{0.0}, {{0.0}}};
 
-    const std::expected<Core::Estimate, std::string> corrected =
+    const Core::Result<Core::Estimate> corrected =
         Core::CorrectEstimate(prior, Core::Matrix({{1.0}}), Core::Matrix({{0.0}}), {2.0});
 
     EXPECT_FALSE(corrected);

@@ -6,10 +6,10 @@
 #ifndef KALMAN_CPP_EXTENDED_KALMAN_FILTER_H
 #define KALMAN_CPP_EXTENDED_KALMAN_FILTER_H
 
+#include "core/result.h"
 #include "matrix/matrix.h"
 
 #include <cstddef>
-#include <expected>
 #include <functional>
 #include <optional>
 #include <string>
@@ -25,7 +25,7 @@ namespace Core {
  *
  *          A filter is created with the sizes of the state, the measurement and the optional control input,
  *          configured through the setters and ready to predict and update once the four functions and the error
- *          covariance `P` have been set. Operations that can fail return `std::expected` with a message, and a
+ *          covariance `P` have been set. Operations that can fail return a `Result` with a message, and a
  *          filter is left unchanged when an operation fails. The class is not thread safe.
  */
 class ExtendedKalmanFilter {
@@ -37,23 +37,22 @@ public:
     using ObservationJacobianFunction = std::function<Matrix(const Vector &state)>;
 
     // Construction
-    [[nodiscard]] static std::expected<ExtendedKalmanFilter, std::string>
-    Create(std::size_t state_dim, std::size_t measurement_dim, std::size_t control_dim = 0);
+    [[nodiscard]] static Result<ExtendedKalmanFilter> Create(std::size_t state_dim, std::size_t measurement_dim,
+                                                             std::size_t control_dim = 0);
 
     // Model configuration
-    [[nodiscard]] std::expected<void, std::string> InitializeState(const Vector &initial_state);
-    [[nodiscard]] std::expected<void, std::string> SetStateTransitionFunction(const StateTransitionFunction &function);
-    [[nodiscard]] std::expected<void, std::string> SetObservationFunction(const ObservationFunction &function);
-    [[nodiscard]] std::expected<void, std::string> SetStateJacobianFunction(const StateJacobianFunction &function);
-    [[nodiscard]] std::expected<void, std::string>
-    SetObservationJacobianFunction(const ObservationJacobianFunction &function);
-    [[nodiscard]] std::expected<void, std::string> SetProcessNoiseCovariance(const Matrix &q);
-    [[nodiscard]] std::expected<void, std::string> SetMeasurementNoiseCovariance(const Matrix &r);
-    [[nodiscard]] std::expected<void, std::string> SetErrorCovariance(const Matrix &p);
+    [[nodiscard]] Result<void> InitializeState(const Vector &initial_state);
+    [[nodiscard]] Result<void> SetStateTransitionFunction(const StateTransitionFunction &function);
+    [[nodiscard]] Result<void> SetObservationFunction(const ObservationFunction &function);
+    [[nodiscard]] Result<void> SetStateJacobianFunction(const StateJacobianFunction &function);
+    [[nodiscard]] Result<void> SetObservationJacobianFunction(const ObservationJacobianFunction &function);
+    [[nodiscard]] Result<void> SetProcessNoiseCovariance(const Matrix &q);
+    [[nodiscard]] Result<void> SetMeasurementNoiseCovariance(const Matrix &r);
+    [[nodiscard]] Result<void> SetErrorCovariance(const Matrix &p);
 
     // Filtering
-    [[nodiscard]] std::expected<void, std::string> Predict(const Vector &control = {});
-    [[nodiscard]] std::expected<void, std::string> Update(const Vector &measurement);
+    [[nodiscard]] Result<void> Predict(const Vector &control = {});
+    [[nodiscard]] Result<void> Update(const Vector &measurement);
 
     // Estimates
     const Vector &GetState() const;

@@ -5,8 +5,9 @@
 
 #include "demo_support.h"
 
+#include <cctype>
 #include <cmath>
-#include <format>
+#include <iomanip>
 #include <iostream>
 
 namespace Demo {
@@ -39,6 +40,34 @@ double NoiseSource::Gaussian(const double standard_deviation) {
 }
 
 /**
+ * @brief   Applies the part of a Format field after the colon to a stream.
+ * @param[in,out] stream  Stream the field's value is about to be written to.
+ * @param[in]     spec    The text between the braces: empty, or a colon followed by an optional width and an optional
+ *                        precision with the letter f, such as ":8.3f".
+ */
+void ApplyFormatSpec(std::ostream &stream, const std::string &spec) {
+    if (spec.empty() || spec.front() != ':') {
+        return;
+    }
+    std::size_t position = 1;
+    int width = 0;
+    while (position < spec.size() && std::isdigit(static_cast<unsigned char>(spec[position])) != 0) {
+        width = width * 10 + (spec[position] - '0');
+        position++;
+    }
+    stream << std::setw(width);
+    if (position < spec.size() && spec[position] == '.') {
+        position++;
+        int precision = 0;
+        while (position < spec.size() && std::isdigit(static_cast<unsigned char>(spec[position])) != 0) {
+            precision = precision * 10 + (spec[position] - '0');
+            position++;
+        }
+        stream << std::fixed << std::setprecision(precision);
+    }
+}
+
+/**
  * @brief   Summarizes a series of errors in a single number.
  * @param[in] errors  Differences between estimates, or measurements, and the truth; not empty.
  * @return  The square root of the mean of the squares.
@@ -59,14 +88,13 @@ double RootMeanSquare(const std::vector<double> &errors) {
  * @param[in] required_share  Largest accepted ratio between the two, such as 0.5 for at least twice as good.
  * @return  Nothing when the filter passes, otherwise a message with the three numbers.
  */
-std::expected<void, std::string> CheckImprovement(const std::string_view what, const double filtered_error,
-                                                  const double raw_error, const double required_share) {
-    std::cout << std::format("{}: raw measurements {:.4f}, filter {:.4f} ({:.1f}x smaller)\n", what, raw_error,
-                             filtered_error, raw_error / filtered_error);
+Core::Result<void> CheckImprovement(const std::string_view what, const double filtered_error, const double raw_error,
+                                    const double required_share) {
+    std::cout << Format("{}: raw measurements {:.4f}, filter {:.4f} ({:.1f}x smaller)\n", what, raw_error,
+                        filtered_error, raw_error / filtered_error);
     if (filtered_error > required_share * raw_error) {
-        return std::unexpected(
-            std::format("The filter's {} ({:.4f}) is not at most {:.0f}% of the raw measurements' ({:.4f})", what,
-                        filtered_error, required_share * 100.0, raw_error));
+        return Core::Failure{Format("The filter's {} ({:.4f}) is not at most {:.0f}% of the raw measurements' ({:.4f})",
+                                    what, filtered_error, required_share * 100.0, raw_error)};
     }
     return {};
 }

@@ -40,7 +40,7 @@ TrackingError Track1d(Core::KalmanFilter &filter, const double true_velocity, co
         EXPECT_TRUE(Tests::Succeeded(filter.Update({true_position + noise.Symmetric(noise_amplitude)})));
     }
     const Core::Vector &state = filter.GetState();
-    return {.Position = std::abs(state[0] - true_position), .Velocity = std::abs(state[1] - true_velocity)};
+    return {std::abs(state[0] - true_position), std::abs(state[1] - true_velocity)};
 }
 
 // Follows an object that moves at a constant velocity on a plane, measured with uniform noise on each axis
@@ -57,8 +57,7 @@ TrackingError Track2d(Core::KalmanFilter &filter, const double true_vx, const do
             filter.Update({true_x + noise.Symmetric(noise_amplitude), true_y + noise.Symmetric(noise_amplitude)})));
     }
     const Core::Vector &state = filter.GetState();
-    return {.Position = std::hypot(state[0] - true_x, state[1] - true_y),
-            .Velocity = std::hypot(state[2] - true_vx, state[3] - true_vy)};
+    return {std::hypot(state[0] - true_x, state[1] - true_y), std::hypot(state[2] - true_vx, state[3] - true_vy)};
 }
 
 } // namespace
@@ -72,7 +71,7 @@ TEST(KalmanFilter, AFilterNeedsAtLeastOneStateAndOneMeasurement) {
 }
 
 TEST(KalmanFilter, ANewFilterHasAZeroStateAndIsNotReady) {
-    const std::expected<Core::KalmanFilter, std::string> filter = Core::KalmanFilter::Create(3, 2, 1);
+    const Core::Result<Core::KalmanFilter> filter = Core::KalmanFilter::Create(3, 2, 1);
 
     ASSERT_TRUE(Tests::Succeeded(filter));
     EXPECT_TRUE(Tests::VectorNear({0.0, 0.0, 0.0}, filter->GetState(), 0.0));
@@ -80,7 +79,7 @@ TEST(KalmanFilter, ANewFilterHasAZeroStateAndIsNotReady) {
 }
 
 TEST(KalmanFilter, TheFilterIsReadyOnlyOnceTheErrorCovarianceIsSet) {
-    std::expected<Core::KalmanFilter, std::string> filter = Core::KalmanFilter::Create(2, 1);
+    Core::Result<Core::KalmanFilter> filter = Core::KalmanFilter::Create(2, 1);
     ASSERT_TRUE(Tests::Succeeded(filter));
 
     EXPECT_FALSE(filter->Predict());
@@ -91,7 +90,7 @@ TEST(KalmanFilter, TheFilterIsReadyOnlyOnceTheErrorCovarianceIsSet) {
 }
 
 TEST(KalmanFilter, TheInitialStateMustHaveOneValuePerState) {
-    std::expected<Core::KalmanFilter, std::string> filter = Core::KalmanFilter::Create(2, 1);
+    Core::Result<Core::KalmanFilter> filter = Core::KalmanFilter::Create(2, 1);
     ASSERT_TRUE(Tests::Succeeded(filter));
 
     EXPECT_FALSE(filter->InitializeState({1.0, 2.0, 3.0}));
@@ -100,7 +99,7 @@ TEST(KalmanFilter, TheInitialStateMustHaveOneValuePerState) {
 }
 
 TEST(KalmanFilter, MatricesOfTheWrongShapeAreRejectedAndLeaveTheFilterNotReady) {
-    std::expected<Core::KalmanFilter, std::string> filter = Core::KalmanFilter::Create(2, 1);
+    Core::Result<Core::KalmanFilter> filter = Core::KalmanFilter::Create(2, 1);
     ASSERT_TRUE(Tests::Succeeded(filter));
     const Core::Matrix wrong = Core::Matrix::Identity(3);
 
@@ -113,18 +112,18 @@ TEST(KalmanFilter, MatricesOfTheWrongShapeAreRejectedAndLeaveTheFilterNotReady) 
 }
 
 TEST(KalmanFilter, TheErrorMessageSaysWhichShapeWasExpected) {
-    std::expected<Core::KalmanFilter, std::string> filter = Core::KalmanFilter::Create(2, 1);
+    Core::Result<Core::KalmanFilter> filter = Core::KalmanFilter::Create(2, 1);
     ASSERT_TRUE(Tests::Succeeded(filter));
 
-    const std::expected<void, std::string> outcome = filter->SetObservationMatrix(Core::Matrix(2, 2));
+    const Core::Result<void> outcome = filter->SetObservationMatrix(Core::Matrix(2, 2));
 
     ASSERT_FALSE(outcome);
-    EXPECT_EQ(outcome.error(), "The observation matrix must be 1x2, not 2x2");
+    EXPECT_EQ(outcome.Error(), "The observation matrix must be 1x2, not 2x2");
 }
 
 TEST(KalmanFilter, AControlMatrixNeedsAFilterWithControlInputs) {
-    std::expected<Core::KalmanFilter, std::string> without_control = Core::KalmanFilter::Create(2, 1);
-    std::expected<Core::KalmanFilter, std::string> with_control = Core::KalmanFilter::Create(2, 1, 1);
+    Core::Result<Core::KalmanFilter> without_control = Core::KalmanFilter::Create(2, 1);
+    Core::Result<Core::KalmanFilter> with_control = Core::KalmanFilter::Create(2, 1, 1);
     ASSERT_TRUE(Tests::Succeeded(without_control));
     ASSERT_TRUE(Tests::Succeeded(with_control));
     const Core::Matrix control_matrix{{0.5}, {1.0}};
@@ -161,7 +160,7 @@ TEST(KalmanFilter, PredictingGrowsTheUncertaintyByFPFTransposedPlusQ) {
 }
 
 TEST(KalmanFilter, PredictingAddsTheEffectOfTheControlInput) {
-    std::expected<Core::KalmanFilter, std::string> filter = Core::KalmanFilter::Create(2, 1, 1);
+    Core::Result<Core::KalmanFilter> filter = Core::KalmanFilter::Create(2, 1, 1);
     ASSERT_TRUE(Tests::Succeeded(filter));
     ASSERT_TRUE(Tests::Succeeded(filter->InitializeState({0.0, 1.0})));
     ASSERT_TRUE(Tests::Succeeded(filter->SetStateTransitionMatrix({{1.0, TimeStep}, {0.0, 1.0}})));
@@ -196,7 +195,7 @@ TEST(KalmanFilter, UpdatingLandsBetweenThePredictionAndTheMeasurement) {
 }
 
 TEST(KalmanFilter, UpdatingWithEqualTrustLandsHalfwayToTheMeasurement) {
-    std::expected<Core::KalmanFilter, std::string> filter = Core::KalmanFilter::Create(1, 1);
+    Core::Result<Core::KalmanFilter> filter = Core::KalmanFilter::Create(1, 1);
     ASSERT_TRUE(Tests::Succeeded(filter));
     ASSERT_TRUE(Tests::Succeeded(filter->SetObservationMatrix({{1.0}})));
     ASSERT_TRUE(Tests::Succeeded(filter->SetMeasurementNoiseCovariance({{1.0}})));
@@ -233,7 +232,7 @@ TEST(KalmanFilter, AMeasurementOfTheWrongSizeIsRejected) {
 }
 
 TEST(KalmanFilter, AnUpdateWithASingularInnovationFailsAndChangesNothing) {
-    std::expected<Core::KalmanFilter, std::string> filter = Core::KalmanFilter::Create(1, 1);
+    Core::Result<Core::KalmanFilter> filter = Core::KalmanFilter::Create(1, 1);
     ASSERT_TRUE(Tests::Succeeded(filter));
     ASSERT_TRUE(Tests::Succeeded(filter->InitializeState({5.0})));
     // H = 0 and R = 0 leave S = 0, which cannot be inverted
@@ -273,7 +272,7 @@ TEST(KalmanFilter, ResettingClearsTheEstimateButKeepsTheModel) {
 }
 
 TEST(KalmanFilter, AFilterWithManyStatesKeepsAllOfThem) {
-    std::expected<Core::KalmanFilter, std::string> filter = Core::KalmanFilter::Create(10, 3);
+    Core::Result<Core::KalmanFilter> filter = Core::KalmanFilter::Create(10, 3);
     ASSERT_TRUE(Tests::Succeeded(filter));
     const Core::Vector state(10, 1.0);
 

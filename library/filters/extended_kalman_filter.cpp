@@ -5,9 +5,9 @@
 
 #include "extended_kalman_filter.h"
 
+#include "core/text.h"
 #include "filters/kalman_math.h"
 
-#include <format>
 #include <utility>
 
 namespace Core {
@@ -21,14 +21,14 @@ namespace Core {
  * @param[in] control_dim      Number of control inputs; zero for a system without control.
  * @return  The filter, or a message saying which size is invalid.
  */
-std::expected<ExtendedKalmanFilter, std::string> ExtendedKalmanFilter::Create(const std::size_t state_dim,
-                                                                              const std::size_t measurement_dim,
-                                                                              const std::size_t control_dim) {
+Result<ExtendedKalmanFilter> ExtendedKalmanFilter::Create(const std::size_t state_dim,
+                                                          const std::size_t measurement_dim,
+                                                          const std::size_t control_dim) {
     if (state_dim == 0) {
-        return std::unexpected("The state dimension cannot be zero");
+        return Failure{"The state dimension cannot be zero"};
     }
     if (measurement_dim == 0) {
-        return std::unexpected("The measurement dimension cannot be zero");
+        return Failure{"The measurement dimension cannot be zero"};
     }
     return ExtendedKalmanFilter(state_dim, measurement_dim, control_dim);
 }
@@ -38,10 +38,9 @@ std::expected<ExtendedKalmanFilter, std::string> ExtendedKalmanFilter::Create(co
  * @param[in] initial_state  One value per state.
  * @return  Nothing, or a message when the number of values is wrong.
  */
-std::expected<void, std::string> ExtendedKalmanFilter::InitializeState(const Vector &initial_state) {
+Result<void> ExtendedKalmanFilter::InitializeState(const Vector &initial_state) {
     if (initial_state.size() != m_StateDim) {
-        return std::unexpected(
-            std::format("The initial state must have {} elements, not {}", m_StateDim, initial_state.size()));
+        return Failure{Concat("The initial state must have ", m_StateDim, " elements, not ", initial_state.size())};
     }
     m_State = initial_state;
     return {};
@@ -53,10 +52,9 @@ std::expected<void, std::string> ExtendedKalmanFilter::InitializeState(const Vec
  *                      control vector when the step has no control input.
  * @return  Nothing, or a message when the function is empty.
  */
-std::expected<void, std::string>
-ExtendedKalmanFilter::SetStateTransitionFunction(const StateTransitionFunction &function) {
+Result<void> ExtendedKalmanFilter::SetStateTransitionFunction(const StateTransitionFunction &function) {
     if (!function) {
-        return std::unexpected("The state transition function cannot be empty");
+        return Failure{"The state transition function cannot be empty"};
     }
     m_StateTransitionFunction = function;
     return {};
@@ -67,9 +65,9 @@ ExtendedKalmanFilter::SetStateTransitionFunction(const StateTransitionFunction &
  * @param[in] function  Function that maps the state to the measurement it should produce.
  * @return  Nothing, or a message when the function is empty.
  */
-std::expected<void, std::string> ExtendedKalmanFilter::SetObservationFunction(const ObservationFunction &function) {
+Result<void> ExtendedKalmanFilter::SetObservationFunction(const ObservationFunction &function) {
     if (!function) {
-        return std::unexpected("The observation function cannot be empty");
+        return Failure{"The observation function cannot be empty"};
     }
     m_ObservationFunction = function;
     return {};
@@ -80,9 +78,9 @@ std::expected<void, std::string> ExtendedKalmanFilter::SetObservationFunction(co
  * @param[in] function  Function that returns `df/dx` as a `state_dim x state_dim` matrix.
  * @return  Nothing, or a message when the function is empty.
  */
-std::expected<void, std::string> ExtendedKalmanFilter::SetStateJacobianFunction(const StateJacobianFunction &function) {
+Result<void> ExtendedKalmanFilter::SetStateJacobianFunction(const StateJacobianFunction &function) {
     if (!function) {
-        return std::unexpected("The state Jacobian function cannot be empty");
+        return Failure{"The state Jacobian function cannot be empty"};
     }
     m_StateJacobianFunction = function;
     return {};
@@ -93,10 +91,9 @@ std::expected<void, std::string> ExtendedKalmanFilter::SetStateJacobianFunction(
  * @param[in] function  Function that returns `dh/dx` as a `measurement_dim x state_dim` matrix.
  * @return  Nothing, or a message when the function is empty.
  */
-std::expected<void, std::string>
-ExtendedKalmanFilter::SetObservationJacobianFunction(const ObservationJacobianFunction &function) {
+Result<void> ExtendedKalmanFilter::SetObservationJacobianFunction(const ObservationJacobianFunction &function) {
     if (!function) {
-        return std::unexpected("The observation Jacobian function cannot be empty");
+        return Failure{"The observation Jacobian function cannot be empty"};
     }
     m_ObservationJacobianFunction = function;
     return {};
@@ -107,7 +104,7 @@ ExtendedKalmanFilter::SetObservationJacobianFunction(const ObservationJacobianFu
  * @param[in] q  Matrix of size `state_dim x state_dim`.
  * @return  Nothing, or a message when the shape is wrong.
  */
-std::expected<void, std::string> ExtendedKalmanFilter::SetProcessNoiseCovariance(const Matrix &q) {
+Result<void> ExtendedKalmanFilter::SetProcessNoiseCovariance(const Matrix &q) {
     if (const auto shape = CheckShape("The process noise covariance", q, m_StateDim, m_StateDim); !shape) {
         return shape;
     }
@@ -120,7 +117,7 @@ std::expected<void, std::string> ExtendedKalmanFilter::SetProcessNoiseCovariance
  * @param[in] r  Matrix of size `measurement_dim x measurement_dim`.
  * @return  Nothing, or a message when the shape is wrong.
  */
-std::expected<void, std::string> ExtendedKalmanFilter::SetMeasurementNoiseCovariance(const Matrix &r) {
+Result<void> ExtendedKalmanFilter::SetMeasurementNoiseCovariance(const Matrix &r) {
     if (const auto shape = CheckShape("The measurement noise covariance", r, m_MeasurementDim, m_MeasurementDim);
         !shape) {
         return shape;
@@ -134,7 +131,7 @@ std::expected<void, std::string> ExtendedKalmanFilter::SetMeasurementNoiseCovari
  * @param[in] p  Matrix of size `state_dim x state_dim`.
  * @return  Nothing, or a message when the shape is wrong.
  */
-std::expected<void, std::string> ExtendedKalmanFilter::SetErrorCovariance(const Matrix &p) {
+Result<void> ExtendedKalmanFilter::SetErrorCovariance(const Matrix &p) {
     if (const auto shape = CheckShape("The error covariance", p, m_StateDim, m_StateDim); !shape) {
         return shape;
     }
@@ -150,16 +147,15 @@ std::expected<void, std::string> ExtendedKalmanFilter::SetErrorCovariance(const 
  * @return  Nothing, or a message when the filter is not ready, the control input has the wrong size, or a function
  *          returns a result of the wrong size.
  */
-std::expected<void, std::string> ExtendedKalmanFilter::Predict(const Vector &control) {
+Result<void> ExtendedKalmanFilter::Predict(const Vector &control) {
     if (!m_IsInitialized) {
-        return std::unexpected("The Extended Kalman filter is not initialized; set the error covariance first");
+        return Failure{"The Extended Kalman filter is not initialized; set the error covariance first"};
     }
     if (!AreAllFunctionsSet()) {
-        return std::unexpected("The four model functions must be set before predicting");
+        return Failure{"The four model functions must be set before predicting"};
     }
     if (!control.empty() && control.size() != m_ControlDim) {
-        return std::unexpected(
-            std::format("The control input must have {} elements, not {}", m_ControlDim, control.size()));
+        return Failure{Concat("The control input must have ", m_ControlDim, " elements, not ", control.size())};
     }
 
     const Matrix jacobian = m_StateJacobianFunction(m_State);
@@ -168,8 +164,8 @@ std::expected<void, std::string> ExtendedKalmanFilter::Predict(const Vector &con
     }
     Vector next_state = m_StateTransitionFunction(m_State, control);
     if (next_state.size() != m_StateDim) {
-        return std::unexpected(std::format("The state transition function must return {} elements, not {}", m_StateDim,
-                                           next_state.size()));
+        return Failure{
+            Concat("The state transition function must return ", m_StateDim, " elements, not ", next_state.size())};
     }
 
     m_ErrorCovariance = PredictCovariance(jacobian, m_ErrorCovariance, m_ProcessNoise);
@@ -185,22 +181,21 @@ std::expected<void, std::string> ExtendedKalmanFilter::Predict(const Vector &con
  * @return  Nothing, or a message when the filter is not ready, the measurement has the wrong size, a function returns
  *          a result of the wrong size, or the innovation covariance cannot be inverted.
  */
-std::expected<void, std::string> ExtendedKalmanFilter::Update(const Vector &measurement) {
+Result<void> ExtendedKalmanFilter::Update(const Vector &measurement) {
     if (!m_IsInitialized) {
-        return std::unexpected("The Extended Kalman filter is not initialized; set the error covariance first");
+        return Failure{"The Extended Kalman filter is not initialized; set the error covariance first"};
     }
     if (!AreAllFunctionsSet()) {
-        return std::unexpected("The four model functions must be set before updating");
+        return Failure{"The four model functions must be set before updating"};
     }
     if (measurement.size() != m_MeasurementDim) {
-        return std::unexpected(
-            std::format("The measurement must have {} elements, not {}", m_MeasurementDim, measurement.size()));
+        return Failure{Concat("The measurement must have ", m_MeasurementDim, " elements, not ", measurement.size())};
     }
 
     const Vector expected_measurement = m_ObservationFunction(m_State);
     if (expected_measurement.size() != m_MeasurementDim) {
-        return std::unexpected(std::format("The observation function must return {} elements, not {}", m_MeasurementDim,
-                                           expected_measurement.size()));
+        return Failure{Concat("The observation function must return ", m_MeasurementDim, " elements, not ",
+                              expected_measurement.size())};
     }
     const Matrix jacobian = m_ObservationJacobianFunction(m_State);
     if (const auto shape = CheckShape("The observation Jacobian", jacobian, m_MeasurementDim, m_StateDim); !shape) {
@@ -212,10 +207,10 @@ std::expected<void, std::string> ExtendedKalmanFilter::Update(const Vector &meas
         innovation[index] = measurement[index] - expected_measurement[index];
     }
 
-    std::expected<Estimate, std::string> corrected =
-        CorrectEstimate({.State = m_State, .Covariance = m_ErrorCovariance}, jacobian, m_MeasurementNoise, innovation);
+    Result<Estimate> corrected =
+        CorrectEstimate({m_State, m_ErrorCovariance}, jacobian, m_MeasurementNoise, innovation);
     if (!corrected) {
-        return std::unexpected(corrected.error());
+        return Failure{corrected.Error()};
     }
 
     m_State = std::move(corrected->State);
