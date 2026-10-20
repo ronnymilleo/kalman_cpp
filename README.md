@@ -6,16 +6,22 @@
 [![Coverage Status](https://coveralls.io/repos/github/ronnymilleo/kalman_cpp/badge.svg?branch=main)](https://coveralls.io/github/ronnymilleo/kalman_cpp?branch=main)
 [![CodeFactor](https://www.codefactor.io/repository/github/ronnymilleo/kalman_cpp/badge)](https://www.codefactor.io/repository/github/ronnymilleo/kalman_cpp)
 
-Kalman and Extended Kalman filters in C++17, for real-time state estimation.
+Kalman and Extended Kalman filters in C++17, for real-time state estimation. A C17 version that never allocates memory,
+for embedded targets, is [kalman_c](https://github.com/ronnymilleo/kalman_c).
 
 ## Features
 
 - **Kalman filter** for linear systems and **Extended Kalman filter** for non-linear ones, with optional control input.
 - **No exceptions**: operations that can fail return a `Core::Result<T>` (a value, or a message) that says what was
   wrong, and a filter is left unchanged when an operation fails.
+- **Allocates memory**: matrices and vectors are `std::vector`s, so every operation uses the heap. For a target that
+  cannot allocate, use kalman_c.
+- **Angles**: an optional residual function and state normalizer let headings and bearings wrap around, so an
+  estimate does not jump when an angle crosses the +-pi boundary (see [Angles](#angles)).
 - **`Core::Matrix`**: a dense row-major matrix with the arithmetic the filters need (`+`, `-`, `*`, transpose and
   inverse), so the filter equations read like the textbook.
-- **Unit tests** with GoogleTest, and two demonstration programs.
+- **Unit tests** with GoogleTest, and two demonstration programs that compare the filter with the truth they simulate
+  and fail when it does no better than the raw measurements, so they also run as tests.
 
 ## Project structure
 
@@ -54,13 +60,13 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-| Option                         | Default | Purpose                                            |
-|--------------------------------|---------|----------------------------------------------------|
-| `KALMAN_CPP_BUILD_TESTS`       | `OFF`   | Build the unit tests                               |
-| `KALMAN_CPP_BUILD_EXAMPLES`    | `ON`    | Build the demonstration programs                   |
-| `KALMAN_CPP_WARNINGS_AS_ERRORS`| `OFF`   | Make warnings in the project's code fail the build |
-| `KALMAN_CPP_ENABLE_SANITIZERS` | `OFF`   | AddressSanitizer and UndefinedBehaviorSanitizer    |
-| `KALMAN_CPP_ENABLE_COVERAGE`   | `OFF`   | Instrument the library for `gcov` (GCC or Clang)   |
+| Option                          | Default | Purpose                                            |
+|---------------------------------|---------|----------------------------------------------------|
+| `KALMAN_CPP_BUILD_TESTS`        | `OFF`   | Build the unit tests                               |
+| `KALMAN_CPP_BUILD_EXAMPLES`     | `ON`    | Build the demonstration programs                   |
+| `KALMAN_CPP_WARNINGS_AS_ERRORS` | `OFF`   | Make warnings in the project's code fail the build |
+| `KALMAN_CPP_ENABLE_SANITIZERS`  | `OFF`   | AddressSanitizer and UndefinedBehaviorSanitizer    |
+| `KALMAN_CPP_ENABLE_COVERAGE`    | `OFF`   | Instrument the library for `gcov` (GCC or Clang)   |
 
 Building also runs `clang-format` over the sources when it is installed, through the `format` target.
 
