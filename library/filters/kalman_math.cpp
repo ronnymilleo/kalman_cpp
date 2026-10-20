@@ -26,6 +26,31 @@ Result<void> CheckShape(const std::string_view name, const Matrix &matrix, const
 }
 
 /**
+ * @brief   Computes the innovation of a measurement.
+ * @param[in] measurement           The measurement.
+ * @param[in] expected_measurement  What the estimate predicts, with the same size.
+ * @param[in] residual              Function that computes the difference, or empty to subtract.
+ * @return  The innovation, or a message when the residual function returns the wrong size.
+ */
+Result<Vector> ComputeInnovation(const Vector &measurement, const Vector &expected_measurement,
+                                 const ResidualFunction &residual) {
+    if (residual) {
+        Vector innovation = residual(measurement, expected_measurement);
+        if (innovation.size() != measurement.size()) {
+            return Failure{
+                Concat("The residual function must return ", measurement.size(), " elements, not ", innovation.size())};
+        }
+        return innovation;
+    }
+
+    Vector innovation(measurement.size());
+    for (std::size_t index = 0; index < measurement.size(); index++) {
+        innovation[index] = measurement[index] - expected_measurement[index];
+    }
+    return innovation;
+}
+
+/**
  * @brief   Propagates the uncertainty of the state through one step of the model.
  * @param[in] transition     State transition matrix `F`, or its Jacobian for a non-linear model.
  * @param[in] covariance     Error covariance `P` before the step.

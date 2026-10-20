@@ -7,6 +7,7 @@
 #define KALMAN_CPP_KALMAN_FILTER_H
 
 #include "core/result.h"
+#include "filters/kalman_math.h"
 #include "matrix/matrix.h"
 
 #include <cstddef>
@@ -41,6 +42,10 @@ public:
     [[nodiscard]] Result<void> SetMeasurementNoiseCovariance(const Matrix &r);
     [[nodiscard]] Result<void> SetErrorCovariance(const Matrix &p);
 
+    // Angles and other states that do not live on a line
+    void SetResidualFunction(const ResidualFunction &residual);
+    void SetStateNormalizer(const StateNormalizer &normalizer);
+
     // Filtering
     [[nodiscard]] Result<void> Predict(const Vector &control = {});
     [[nodiscard]] Result<void> Update(const Vector &measurement);
@@ -70,6 +75,9 @@ private:
     Matrix m_ProcessNoise;
     Matrix m_ObservationMatrix;
     Matrix m_MeasurementNoise;
+
+    ResidualFunction m_Residual;
+    StateNormalizer m_Normalizer;
 
     bool m_IsInitialized = false;
 
