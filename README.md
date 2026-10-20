@@ -19,6 +19,7 @@ Kalman and Extended Kalman filters in C++17, for real-time state estimation.
 
 ```
 ├── library/
+│   ├── core/                 # Core::Result, Core::Concat and the angle helpers
 │   ├── matrix/               # Core::Matrix
 │   └── filters/              # KalmanFilter, ExtendedKalmanFilter and the equations they share
 ├── examples/                 # kalman_demo and extended_kalman_demo
@@ -132,6 +133,26 @@ const Core::Result<void> configured =
 
 `Predict()` and `Update()` fail with a message until the four functions and the error covariance are set.
 
+### Angles
+
+A heading or a bearing lives on a circle: 179 degrees measured against a prediction of -179 degrees is a 2 degree error,
+not 358, and a plain subtraction gets it wrong. Two optional hooks fix that, in the linear and the extended filter alike:
+
+```cpp
+#include "core/angle.h"
+
+filter.SetResidualFunction([](const Core::Vector &measurement, const Core::Vector &expected) {
+    return Core::Vector{Core::AngleDifference(measurement[0], expected[0])}; // computes the innovation y
+});
+filter.SetStateNormalizer([](Core::Vector &state) {
+    state[0] = Core::WrapAngle(state[0]); // adjusts the state before Predict() and Update() store it
+});
+```
+
+The residual function replaces `y = z - h(x)`, and the state normalizer is the place to wrap angle states, or to
+renormalize any other state with a constraint, once the filter has moved it. Both are empty by default, which keeps the
+plain subtraction and leaves the state as computed; passing an empty function clears them.
+
 ## Mathematical background
 
 ### Prediction
@@ -142,7 +163,8 @@ const Core::Result<void> configured =
 
 ### Update
 
-- **Innovation**: `y = z - H x` (linear) or `y = z - h(x)` (extended, with `H` the Jacobian of `h`)
+- **Innovation**: `y = z - H x` (linear) or `y = z - h(x)` (extended, with `H` the Jacobian of `h`); a residual
+  function can replace the subtraction
 - **Innovation covariance**: `S = H P Hᵀ + R`
 - **Kalman gain**: `K = P Hᵀ S⁻¹`
 - **State**: `x = x + K y`
