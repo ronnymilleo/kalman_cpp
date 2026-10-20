@@ -19,6 +19,7 @@ add_library(kalman-cpp-core-lib STATIC
 target_include_directories(kalman-cpp-core-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 kalman_cpp_configure_target(kalman-cpp-core-lib)
+kalman_cpp_target_coverage(kalman-cpp-core-lib)
 
 # Formatting runs before every build, so unformatted code never reaches a commit
 add_dependencies(kalman-cpp-core-lib format)
