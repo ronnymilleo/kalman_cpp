@@ -10,8 +10,6 @@
 
 #include <cmath>
 #include <cstdlib>
-#include <expected>
-#include <format>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -28,19 +26,19 @@ constexpr double RequiredErrorShare = 0.5;
 // The velocity is never measured, so the check is an absolute limit, small next to the velocities in the scenarios
 constexpr double MaxVelocityError = 0.3;
 
-// Every setter reports a problem as a message; chaining them with and_then stops at the first one
-std::expected<void, std::string> Configure(Core::KalmanFilter &filter, const Core::Vector &initial_state,
-                                           const Core::Matrix &f, const Core::Matrix &h, const Core::Matrix &q,
-                                           const Core::Matrix &r, const Core::Matrix &p) {
+// Every setter reports a problem as a message; chaining them with AndThen stops at the first one
+Core::Result<void> Configure(Core::KalmanFilter &filter, const Core::Vector &initial_state, const Core::Matrix &f,
+                             const Core::Matrix &h, const Core::Matrix &q, const Core::Matrix &r,
+                             const Core::Matrix &p) {
     return filter.InitializeState(initial_state)
-        .and_then([&] { return filter.SetStateTransitionMatrix(f); })
-        .and_then([&] { return filter.SetObservationMatrix(h); })
-        .and_then([&] { return filter.SetProcessNoiseCovariance(q); })
-        .and_then([&] { return filter.SetMeasurementNoiseCovariance(r); })
-        .and_then([&] { return filter.SetErrorCovariance(p); });
+        .AndThen([&] { return filter.SetStateTransitionMatrix(f); })
+        .AndThen([&] { return filter.SetObservationMatrix(h); })
+        .AndThen([&] { return filter.SetProcessNoiseCovariance(q); })
+        .AndThen([&] { return filter.SetMeasurementNoiseCovariance(r); })
+        .AndThen([&] { return filter.SetErrorCovariance(p); });
 }
 
-std::expected<void, std::string> DemonstrateTracking1d() {
+Core::Result<void> DemonstrateTracking1d() {
     std::cout << "=== Kalman filter: position and velocity on a line ===\n\n";
 
     constexpr double TimeStep = 0.1;
@@ -49,14 +47,14 @@ std::expected<void, std::string> DemonstrateTracking1d() {
     constexpr double MeasurementNoise = 0.5;
     constexpr int Steps = 100;
 
-    std::expected<Core::KalmanFilter, std::string> created = Core::KalmanFilter::Create(2, 1);
+    Core::Result<Core::KalmanFilter> created = Core::KalmanFilter::Create(2, 1);
     if (!created) {
-        return std::unexpected(created.error());
+        return Core::Failure{created.Error()};
     }
     Core::KalmanFilter &filter = *created;
 
     // The velocity starts as a poor guess, with a high uncertainty to match
-    const std::expected<void, std::string> configured =
+    const Core::Result<void> configured =
         Configure(filter, {0.0, 0.0},
                   // Constant velocity: the position grows by velocity * dt at every step
                   {{1.0, TimeStep}, {0.0, 1.0}},
@@ -94,9 +92,9 @@ std::expected<void, std::string> DemonstrateTracking1d() {
             raw_errors.push_back(measured_position - true_position);
         }
         if (step % 5 == 0 || step < 3 || step >= Steps - 3) {
-            std::cout << std::format("{:4} | {:8.3f} | {:8.3f} | {:7.3f} | {:7.3f} | {:7.3f} | {:7.3f}\n", step,
-                                     true_position, measured_position, state[0], state[1],
-                                     std::abs(state[0] - true_position), std::abs(state[1] - TrueVelocity));
+            std::cout << Demo::Format("{:4} | {:8.3f} | {:8.3f} | {:7.3f} | {:7.3f} | {:7.3f} | {:7.3f}\n", step,
+                                      true_position, measured_position, state[0], state[1],
+                                      std::abs(state[0] - true_position), std::abs(state[1] - TrueVelocity));
         }
     }
 
@@ -107,17 +105,17 @@ std::expected<void, std::string> DemonstrateTracking1d() {
         return better;
     }
     const double velocity_error = std::abs(filter.GetState()[1] - TrueVelocity);
-    std::cout << std::format("final velocity error: {:.4f} (the true velocity is {})\n", velocity_error, TrueVelocity);
+    std::cout << Demo::Format("final velocity error: {:.4f} (the true velocity is {})\n", velocity_error, TrueVelocity);
     if (velocity_error > MaxVelocityError) {
-        return std::unexpected(
-            std::format("The final velocity error ({:.4f}) exceeds {}", velocity_error, MaxVelocityError));
+        return Core::Failure{
+            Demo::Format("The final velocity error ({:.4f}) exceeds {}", velocity_error, MaxVelocityError)};
     }
 
     std::cout << "\nThe velocity is estimated from position measurements alone.\n\n";
     return {};
 }
 
-std::expected<void, std::string> DemonstrateTracking2d() {
+Core::Result<void> DemonstrateTracking2d() {
     std::cout << "=== Kalman filter: position and velocity on a plane ===\n\n";
 
     constexpr double TimeStep = 0.2;
@@ -128,15 +126,15 @@ std::expected<void, std::string> DemonstrateTracking2d() {
     constexpr double MeasurementNoiseY = 0.4;
     constexpr int Steps = 80;
 
-    std::expected<Core::KalmanFilter, std::string> created = Core::KalmanFilter::Create(4, 2);
+    Core::Result<Core::KalmanFilter> created = Core::KalmanFilter::Create(4, 2);
     if (!created) {
-        return std::unexpected(created.error());
+        return Core::Failure{created.Error()};
     }
     Core::KalmanFilter &filter = *created;
 
     constexpr double Q = ProcessNoise * ProcessNoise;
     // clang-format off
-    const std::expected<void, std::string> configured = Configure(
+    const Core::Result<void> configured = Configure(
         filter, {0.0, 0.0, 0.0, 0.0},
         // The states are x, y, vx and vy
         {{1.0, 0.0, TimeStep, 0.0},
@@ -189,9 +187,9 @@ std::expected<void, std::string> DemonstrateTracking2d() {
             raw_errors.push_back(std::hypot(measured_x - true_x, measured_y - true_y));
         }
         if (step % 3 == 0 || step < 2 || step >= Steps - 2) {
-            std::cout << std::format("{:4} | ({:5.2f},{:6.2f}) | ({:5.2f},{:6.2f}) | ({:5.2f},{:6.2f}) | {:9.3f}\n",
-                                     step, true_x, true_y, state[0], state[1], state[2], state[3],
-                                     std::hypot(state[0] - true_x, state[1] - true_y));
+            std::cout << Demo::Format("{:4} | ({:5.2f},{:6.2f}) | ({:5.2f},{:6.2f}) | ({:5.2f},{:6.2f}) | {:9.3f}\n",
+                                      step, true_x, true_y, state[0], state[1], state[2], state[3],
+                                      std::hypot(state[0] - true_x, state[1] - true_y));
         }
     }
 
@@ -203,17 +201,17 @@ std::expected<void, std::string> DemonstrateTracking2d() {
     }
     const Core::Vector &state = filter.GetState();
     const double velocity_error = std::hypot(state[2] - TrueVx, state[3] - TrueVy);
-    std::cout << std::format("final velocity error: {:.4f}\n", velocity_error);
+    std::cout << Demo::Format("final velocity error: {:.4f}\n", velocity_error);
     if (velocity_error > MaxVelocityError) {
-        return std::unexpected(
-            std::format("The final velocity error ({:.4f}) exceeds {}", velocity_error, MaxVelocityError));
+        return Core::Failure{
+            Demo::Format("The final velocity error ({:.4f}) exceeds {}", velocity_error, MaxVelocityError)};
     }
 
     std::cout << "\nBoth positions and both velocities are estimated from the positions alone.\n\n";
     return {};
 }
 
-std::expected<void, std::string> DemonstrateNoiseSensitivity() {
+Core::Result<void> DemonstrateNoiseSensitivity() {
     std::cout << "=== Kalman filter: noise sensitivity ===\n\n";
 
     constexpr double TimeStep = 0.1;
@@ -226,13 +224,13 @@ std::expected<void, std::string> DemonstrateNoiseSensitivity() {
     // A noisier sensor leaves less to gain, so these checks are looser than in the other demonstrations: the filter
     // only has to beat the raw measurements, and its velocity error has to stay below the noise of the sensor
     for (const double noise_level : {0.1, 0.5, 1.0, 2.0}) {
-        std::expected<Core::KalmanFilter, std::string> created = Core::KalmanFilter::Create(2, 1);
+        Core::Result<Core::KalmanFilter> created = Core::KalmanFilter::Create(2, 1);
         if (!created) {
-            return std::unexpected(created.error());
+            return Core::Failure{created.Error()};
         }
         Core::KalmanFilter &filter = *created;
 
-        const std::expected<void, std::string> configured =
+        const Core::Result<void> configured =
             Configure(filter, {0.0, 0.0}, {{1.0, TimeStep}, {0.0, 1.0}}, {{1.0, 0.0}}, {{0.01, 0.0}, {0.0, 0.01}},
                       {{noise_level * noise_level}}, {{1.0, 0.0}, {0.0, 1.0}});
         if (!configured) {
@@ -264,17 +262,17 @@ std::expected<void, std::string> DemonstrateNoiseSensitivity() {
         const double estimate_error = Demo::RootMeanSquare(estimate_errors);
         const double raw_error = Demo::RootMeanSquare(raw_errors);
         const double velocity_error = Demo::RootMeanSquare(velocity_errors);
-        std::cout << std::format("{:11.1f} | {:13.4f} | {:16.4f} | {:14.4f}\n", noise_level, raw_error, estimate_error,
-                                 velocity_error);
+        std::cout << Demo::Format("{:11.1f} | {:13.4f} | {:16.4f} | {:14.4f}\n", noise_level, raw_error, estimate_error,
+                                  velocity_error);
 
         if (estimate_error > raw_error) {
-            return std::unexpected(
-                std::format("At noise level {} the filter ({:.4f}) is worse than the raw measurements ({:.4f})",
-                            noise_level, estimate_error, raw_error));
+            return Core::Failure{
+                Demo::Format("At noise level {} the filter ({:.4f}) is worse than the raw measurements ({:.4f})",
+                             noise_level, estimate_error, raw_error)};
         }
         if (velocity_error > noise_level) {
-            return std::unexpected(std::format("At noise level {} the velocity error ({:.4f}) is larger than the noise",
-                                               noise_level, velocity_error));
+            return Core::Failure{Demo::Format("At noise level {} the velocity error ({:.4f}) is larger than the noise",
+                                              noise_level, velocity_error)};
         }
     }
 
@@ -290,8 +288,8 @@ int main() {
     std::cout << "============================\n\n";
 
     for (const auto &demonstration : {DemonstrateTracking1d, DemonstrateTracking2d, DemonstrateNoiseSensitivity}) {
-        if (const std::expected<void, std::string> outcome = demonstration(); !outcome) {
-            std::cerr << "Demonstration failed: " << outcome.error() << "\n";
+        if (const Core::Result<void> outcome = demonstration(); !outcome) {
+            std::cerr << "Demonstration failed: " << outcome.Error() << "\n";
             return ExitFailure;
         }
     }

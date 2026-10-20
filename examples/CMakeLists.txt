@@ -8,6 +8,7 @@ add_library(kalman-cpp-demo-support-lib STATIC
 )
 
 target_include_directories(kalman-cpp-demo-support-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(kalman-cpp-demo-support-lib PUBLIC kalman-cpp-core-lib)
 
 kalman_cpp_configure_target(kalman-cpp-demo-support-lib)
 

@@ -11,8 +11,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
-#include <expected>
-#include <format>
 #include <iostream>
 #include <string>
 #include <string_view>
@@ -27,24 +25,24 @@ constexpr double RequiredErrorShare = 0.5;
 constexpr int ExitSuccess = 0;
 constexpr int ExitFailure = 1;
 
-// Every setter reports a problem as a message; chaining them with and_then stops at the first one
-std::expected<void, std::string> Configure(Core::ExtendedKalmanFilter &filter, const Core::Vector &initial_state,
-                                           const Core::ExtendedKalmanFilter::StateTransitionFunction &f,
-                                           const Core::ExtendedKalmanFilter::StateJacobianFunction &jf,
-                                           const Core::ExtendedKalmanFilter::ObservationFunction &h,
-                                           const Core::ExtendedKalmanFilter::ObservationJacobianFunction &jh,
-                                           const Core::Matrix &q, const Core::Matrix &r, const Core::Matrix &p) {
+// Every setter reports a problem as a message; chaining them with AndThen stops at the first one
+Core::Result<void> Configure(Core::ExtendedKalmanFilter &filter, const Core::Vector &initial_state,
+                             const Core::ExtendedKalmanFilter::StateTransitionFunction &f,
+                             const Core::ExtendedKalmanFilter::StateJacobianFunction &jf,
+                             const Core::ExtendedKalmanFilter::ObservationFunction &h,
+                             const Core::ExtendedKalmanFilter::ObservationJacobianFunction &jh, const Core::Matrix &q,
+                             const Core::Matrix &r, const Core::Matrix &p) {
     return filter.InitializeState(initial_state)
-        .and_then([&] { return filter.SetStateTransitionFunction(f); })
-        .and_then([&] { return filter.SetStateJacobianFunction(jf); })
-        .and_then([&] { return filter.SetObservationFunction(h); })
-        .and_then([&] { return filter.SetObservationJacobianFunction(jh); })
-        .and_then([&] { return filter.SetProcessNoiseCovariance(q); })
-        .and_then([&] { return filter.SetMeasurementNoiseCovariance(r); })
-        .and_then([&] { return filter.SetErrorCovariance(p); });
+        .AndThen([&] { return filter.SetStateTransitionFunction(f); })
+        .AndThen([&] { return filter.SetStateJacobianFunction(jf); })
+        .AndThen([&] { return filter.SetObservationFunction(h); })
+        .AndThen([&] { return filter.SetObservationJacobianFunction(jh); })
+        .AndThen([&] { return filter.SetProcessNoiseCovariance(q); })
+        .AndThen([&] { return filter.SetMeasurementNoiseCovariance(r); })
+        .AndThen([&] { return filter.SetErrorCovariance(p); });
 }
 
-std::expected<void, std::string> DemonstrateRadarTracking() {
+Core::Result<void> DemonstrateRadarTracking() {
     std::cout << "=== Extended Kalman filter: radar tracking an aircraft ===\n\n";
 
     constexpr double TimeStep = 1.0;
@@ -62,9 +60,9 @@ std::expected<void, std::string> DemonstrateRadarTracking() {
     constexpr double TrueVx = -1.0;
     constexpr double TrueVy = 0.5;
 
-    std::expected<Core::ExtendedKalmanFilter, std::string> created = Core::ExtendedKalmanFilter::Create(4, 2);
+    Core::Result<Core::ExtendedKalmanFilter> created = Core::ExtendedKalmanFilter::Create(4, 2);
     if (!created) {
-        return std::unexpected(created.error());
+        return Core::Failure{created.Error()};
     }
     Core::ExtendedKalmanFilter &filter = *created;
 
@@ -75,7 +73,7 @@ std::expected<void, std::string> DemonstrateRadarTracking() {
     constexpr double Dt3 = Dt2 * TimeStep;
     constexpr double Dt4 = Dt2 * Dt2;
     // clang-format off
-    const std::expected<void, std::string> configured = Configure(
+    const Core::Result<void> configured = Configure(
         filter, {StartX - 5.0, StartY + 5.0, 0.0, 0.0},
         [](const Core::Vector &state, const Core::Vector & /*control*/) {
             return Core::Vector{state[0] + state[2] * TimeStep, state[1] + state[3] * TimeStep, state[2], state[3]};
@@ -138,10 +136,10 @@ std::expected<void, std::string> DemonstrateRadarTracking() {
             raw_errors.push_back(raw_error);
         }
         if (step % 10 == 0 || step < 3) {
-            std::cout << std::format("{:4} | ({:6.2f},{:6.2f}) | ({:6.2f},{:6.2f}) | ({:6.2f},{:6.2f}) | "
-                                     "({:5.2f},{:5.2f}) | {:7.3f} | {:7.3f}\n",
-                                     step, true_x, true_y, raw_x, raw_y, state[0], state[1], state[2], state[3],
-                                     estimate_error, raw_error);
+            std::cout << Demo::Format("{:4} | ({:6.2f},{:6.2f}) | ({:6.2f},{:6.2f}) | ({:6.2f},{:6.2f}) | "
+                                      "({:5.2f},{:5.2f}) | {:7.3f} | {:7.3f}\n",
+                                      step, true_x, true_y, raw_x, raw_y, state[0], state[1], state[2], state[3],
+                                      estimate_error, raw_error);
         }
     }
 
@@ -153,18 +151,19 @@ std::expected<void, std::string> DemonstrateRadarTracking() {
     }
     const Core::Vector &state = filter.GetState();
     const double velocity_error = std::hypot(state[2] - TrueVx, state[3] - TrueVy);
-    std::cout << std::format("final velocity error: {:.4f} (the filter was never told the velocity)\n", velocity_error);
+    std::cout << Demo::Format("final velocity error: {:.4f} (the filter was never told the velocity)\n",
+                              velocity_error);
     constexpr double MaxVelocityError = 0.1;
     if (velocity_error > MaxVelocityError) {
-        return std::unexpected(
-            std::format("The final velocity error ({:.4f}) exceeds {}", velocity_error, MaxVelocityError));
+        return Core::Failure{
+            Demo::Format("The final velocity error ({:.4f}) exceeds {}", velocity_error, MaxVelocityError)};
     }
 
     std::cout << "\nThe filter turns noisy range and bearing readings into a precise position and a velocity.\n\n";
     return {};
 }
 
-std::expected<void, std::string> DemonstratePendulumTracking() {
+Core::Result<void> DemonstratePendulumTracking() {
     std::cout << "=== Extended Kalman filter: damped pendulum ===\n\n";
 
     constexpr double TimeStep = 0.05;
@@ -175,9 +174,9 @@ std::expected<void, std::string> DemonstratePendulumTracking() {
     constexpr double MeasurementNoise = 0.05;
     constexpr int Steps = 200;
 
-    std::expected<Core::ExtendedKalmanFilter, std::string> created = Core::ExtendedKalmanFilter::Create(2, 1);
+    Core::Result<Core::ExtendedKalmanFilter> created = Core::ExtendedKalmanFilter::Create(2, 1);
     if (!created) {
-        return std::unexpected(created.error());
+        return Core::Failure{created.Error()};
     }
     Core::ExtendedKalmanFilter &filter = *created;
 
@@ -192,7 +191,7 @@ std::expected<void, std::string> DemonstratePendulumTracking() {
 
     // The states are the angle and the angular velocity; the sensor measures the angle only
     // clang-format off
-    const std::expected<void, std::string> configured = Configure(
+    const Core::Result<void> configured = Configure(
         filter, {0.5, 0.0},
         [&step_pendulum](const Core::Vector &state, const Core::Vector & /*control*/) { return step_pendulum(state); },
         [](const Core::Vector &state) {
@@ -241,9 +240,9 @@ std::expected<void, std::string> DemonstratePendulumTracking() {
             velocity_errors.push_back(state[1] - true_velocity);
         }
         if (step % 20 == 0 || step < 5) {
-            std::cout << std::format("{:4} | {:10.4f} | {:8.4f} | {:10.4f} | {:9.4f} | {:7.4f} | {:9.4f}\n", step,
-                                     true_angle, true_velocity, measured_angle, state[0], state[1],
-                                     std::abs(state[0] - true_angle));
+            std::cout << Demo::Format("{:4} | {:10.4f} | {:8.4f} | {:10.4f} | {:9.4f} | {:7.4f} | {:9.4f}\n", step,
+                                      true_angle, true_velocity, measured_angle, state[0], state[1],
+                                      std::abs(state[0] - true_angle));
         }
     }
 
@@ -257,10 +256,10 @@ std::expected<void, std::string> DemonstratePendulumTracking() {
     // next to the velocities involved, which reach about 1.5 rad/s
     constexpr double MaxVelocityError = 0.1;
     const double velocity_error = Demo::RootMeanSquare(velocity_errors);
-    std::cout << std::format("velocity error: {:.4f} rad/s (the sensor never reads the velocity)\n", velocity_error);
+    std::cout << Demo::Format("velocity error: {:.4f} rad/s (the sensor never reads the velocity)\n", velocity_error);
     if (velocity_error > MaxVelocityError) {
-        return std::unexpected(
-            std::format("The velocity error ({:.4f}) exceeds {} rad/s", velocity_error, MaxVelocityError));
+        return Core::Failure{
+            Demo::Format("The velocity error ({:.4f}) exceeds {} rad/s", velocity_error, MaxVelocityError)};
     }
 
     std::cout << "\nThe angular velocity is estimated from angle measurements alone.\n\n";
@@ -274,8 +273,8 @@ int main() {
     std::cout << "=====================================\n\n";
 
     for (const auto &demonstration : {DemonstrateRadarTracking, DemonstratePendulumTracking}) {
-        if (const std::expected<void, std::string> outcome = demonstration(); !outcome) {
-            std::cerr << "Demonstration failed: " << outcome.error() << "\n";
+        if (const Core::Result<void> outcome = demonstration(); !outcome) {
+            std::cerr << "Demonstration failed: " << outcome.Error() << "\n";
             return ExitFailure;
         }
     }

@@ -5,7 +5,7 @@
 
 #include "kalman_math.h"
 
-#include <format>
+#include "core/text.h"
 
 namespace Core {
 
@@ -17,11 +17,10 @@ namespace Core {
  * @param[in] cols    Expected number of columns.
  * @return  Nothing when the shape fits, otherwise a message with the expected and the actual shape.
  */
-std::expected<void, std::string> CheckShape(const std::string_view name, const Matrix &matrix, const std::size_t rows,
-                                            const std::size_t cols) {
+Result<void> CheckShape(const std::string_view name, const Matrix &matrix, const std::size_t rows,
+                        const std::size_t cols) {
     if (matrix.GetRows() != rows || matrix.GetCols() != cols) {
-        return std::unexpected(
-            std::format("{} must be {}x{}, not {}x{}", name, rows, cols, matrix.GetRows(), matrix.GetCols()));
+        return Failure{Concat(name, " must be ", rows, "x", cols, ", not ", matrix.GetRows(), "x", matrix.GetCols())};
     }
     return {};
 }
@@ -50,21 +49,20 @@ Matrix PredictCovariance(const Matrix &transition, const Matrix &covariance, con
  * @note    The shapes must fit: `H` is `measurements x states`, `P` is `states x states`, `R` is
  *          `measurements x measurements` and `y` has one element per measurement.
  */
-std::expected<Estimate, std::string> CorrectEstimate(const Estimate &prior, const Matrix &observation,
-                                                     const Matrix &measurement_noise, const Vector &innovation) {
+Result<Estimate> CorrectEstimate(const Estimate &prior, const Matrix &observation, const Matrix &measurement_noise,
+                                 const Vector &innovation) {
     const Matrix observation_transposed = observation.Transposed();
     const Matrix innovation_covariance = observation * prior.Covariance * observation_transposed + measurement_noise;
 
-    const std::expected<Matrix, std::string> innovation_covariance_inverse = innovation_covariance.Inverse();
+    const Result<Matrix> innovation_covariance_inverse = innovation_covariance.Inverse();
     if (!innovation_covariance_inverse) {
-        return std::unexpected("The innovation covariance cannot be inverted: " +
-                               innovation_covariance_inverse.error());
+        return Failure{"The innovation covariance cannot be inverted: " + innovation_covariance_inverse.Error()};
     }
 
     const Matrix gain = prior.Covariance * observation_transposed * *innovation_covariance_inverse;
     const Vector correction = gain * innovation;
 
-    Estimate corrected{.State = prior.State, .Covariance = {}};
+    Estimate corrected{prior.State, Matrix()};
     for (std::size_t index = 0; index < corrected.State.size(); index++) {
         corrected.State[index] += correction[index];
     }

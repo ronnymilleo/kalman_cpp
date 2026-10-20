@@ -105,7 +105,7 @@ TEST(Matrix, MultiplyingByAVectorGivesOneValueForEachRow) {
 }
 
 TEST(Matrix, TheInverseOfA2x2MatrixMatchesTheClosedForm) {
-    const std::expected<Core::Matrix, std::string> inverse = Core::Matrix({{4, 7}, {2, 6}}).Inverse();
+    const Core::Result<Core::Matrix> inverse = Core::Matrix({{4, 7}, {2, 6}}).Inverse();
 
     ASSERT_TRUE(Tests::Succeeded(inverse));
     EXPECT_TRUE(Tests::MatrixNear(Core::Matrix({{0.6, -0.7}, {-0.2, 0.4}}), *inverse, Tolerance));
@@ -114,7 +114,7 @@ TEST(Matrix, TheInverseOfA2x2MatrixMatchesTheClosedForm) {
 TEST(Matrix, AMatrixTimesItsInverseIsTheIdentity) {
     const Core::Matrix matrix{{2, -1, 0}, {-1, 2, -1}, {0, -1, 2}};
 
-    const std::expected<Core::Matrix, std::string> inverse = matrix.Inverse();
+    const Core::Result<Core::Matrix> inverse = matrix.Inverse();
 
     ASSERT_TRUE(Tests::Succeeded(inverse));
     EXPECT_TRUE(Tests::MatrixNear(Core::Matrix::Identity(3), matrix * *inverse, Tolerance));
@@ -123,7 +123,7 @@ TEST(Matrix, AMatrixTimesItsInverseIsTheIdentity) {
 TEST(Matrix, InversionSwapsRowsWhenTheDiagonalHasAZero) {
     const Core::Matrix matrix{{0, 1}, {1, 0}};
 
-    const std::expected<Core::Matrix, std::string> inverse = matrix.Inverse();
+    const Core::Result<Core::Matrix> inverse = matrix.Inverse();
 
     ASSERT_TRUE(Tests::Succeeded(inverse));
     EXPECT_TRUE(Tests::MatrixNear(matrix, *inverse, Tolerance));
@@ -131,17 +131,17 @@ TEST(Matrix, InversionSwapsRowsWhenTheDiagonalHasAZero) {
 
 TEST(Matrix, AMatrixWithTinyEntriesIsStillInvertible) {
     // A converged covariance can be this small; only a matrix that is singular relative to its scale has no inverse
-    const std::expected<Core::Matrix, std::string> inverse = Core::Matrix({{1e-15, 0}, {0, 1e-15}}).Inverse();
+    const Core::Result<Core::Matrix> inverse = Core::Matrix({{1e-15, 0}, {0, 1e-15}}).Inverse();
 
     ASSERT_TRUE(Tests::Succeeded(inverse));
     EXPECT_NEAR((*inverse)(0, 0), 1e15, 1e3);
 }
 
 TEST(Matrix, ASingularMatrixHasNoInverse) {
-    const std::expected<Core::Matrix, std::string> inverse = Core::Matrix({{1, 2}, {2, 4}}).Inverse();
+    const Core::Result<Core::Matrix> inverse = Core::Matrix({{1, 2}, {2, 4}}).Inverse();
 
     ASSERT_FALSE(inverse);
-    EXPECT_NE(inverse.error().find("singular"), std::string::npos);
+    EXPECT_NE(inverse.Error().find("singular"), std::string::npos);
 }
 
 TEST(Matrix, TheZeroMatrixHasNoInverse) {

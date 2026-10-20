@@ -6,10 +6,10 @@
 #ifndef KALMAN_CPP_KALMAN_MATH_H
 #define KALMAN_CPP_KALMAN_MATH_H
 
+#include "core/result.h"
 #include "matrix/matrix.h"
 
 #include <cstddef>
-#include <expected>
 #include <string>
 #include <string_view>
 
@@ -25,16 +25,14 @@ struct Estimate {
 };
 
 // Validation
-[[nodiscard]] std::expected<void, std::string> CheckShape(std::string_view name, const Matrix &matrix, std::size_t rows,
-                                                          std::size_t cols);
+[[nodiscard]] Result<void> CheckShape(std::string_view name, const Matrix &matrix, std::size_t rows, std::size_t cols);
 
 // Prediction
 Matrix PredictCovariance(const Matrix &transition, const Matrix &covariance, const Matrix &process_noise);
 
 // Correction
-[[nodiscard]] std::expected<Estimate, std::string> CorrectEstimate(const Estimate &prior, const Matrix &observation,
-                                                                   const Matrix &measurement_noise,
-                                                                   const Vector &innovation);
+[[nodiscard]] Result<Estimate> CorrectEstimate(const Estimate &prior, const Matrix &observation,
+                                               const Matrix &measurement_noise, const Vector &innovation);
 
 } // namespace Core
 

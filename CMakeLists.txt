@@ -24,8 +24,8 @@ endif()
 # C++ Standard and Compiler Requirements
 # =============================================================================
 
-# The code uses C++23 features: std::expected and std::format
-set(CMAKE_CXX_STANDARD 23)
+# The code needs C++17 only: structured bindings, std::optional, std::variant and fold expressions
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -49,7 +49,7 @@ endif()
 
 option(KALMAN_CPP_BUILD_TESTS "Build unit tests" OFF)
 option(KALMAN_CPP_BUILD_EXAMPLES "Build example programs" ON)
-option(KALMAN_CPP_ENABLE_COVERAGE "Instrument the code for coverage reports" OFF)
+option(KALMAN_CPP_ENABLE_COVERAGE "Instrument the library for coverage reports (GCC or Clang)" OFF)
 option(KALMAN_CPP_ENABLE_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(KALMAN_CPP_WARNINGS_AS_ERRORS "Treat warnings in the project's own code as errors" OFF)
 
@@ -89,9 +89,14 @@ function(kalman_cpp_configure_target target)
         )
         target_link_options(${target} PRIVATE -fsanitize=address,undefined)
     endif()
-    if(KALMAN_CPP_ENABLE_COVERAGE)
+endfunction()
+
+# Coverage is measured on the library only, so neither the tests, the examples nor GoogleTest count; the link option is
+# PUBLIC because whatever links a static library built with --coverage needs the runtime that writes the data
+function(kalman_cpp_target_coverage target)
+    if(KALMAN_CPP_ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang)$")
         target_compile_options(${target} PRIVATE --coverage)
-        target_link_options(${target} PRIVATE --coverage)
+        target_link_options(${target} PUBLIC --coverage)
     endif()
 endfunction()
 
@@ -104,6 +109,8 @@ set(KALMAN_CPP_FORMAT_SOURCES
     ${CMAKE_SOURCE_DIR}/examples/demo_support.h
     ${CMAKE_SOURCE_DIR}/examples/extended_kalman_demo.cpp
     ${CMAKE_SOURCE_DIR}/examples/kalman_demo.cpp
+    ${CMAKE_SOURCE_DIR}/library/core/result.h
+    ${CMAKE_SOURCE_DIR}/library/core/text.h
     ${CMAKE_SOURCE_DIR}/library/filters/extended_kalman_filter.cpp
     ${CMAKE_SOURCE_DIR}/library/filters/extended_kalman_filter.h
     ${CMAKE_SOURCE_DIR}/library/filters/kalman_filter.cpp

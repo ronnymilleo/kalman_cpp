@@ -5,9 +5,9 @@
 
 #include "kalman_filter.h"
 
+#include "core/text.h"
 #include "filters/kalman_math.h"
 
-#include <format>
 #include <utility>
 
 namespace Core {
@@ -21,13 +21,13 @@ namespace Core {
  * @param[in] control_dim      Number of control inputs; zero for a system without control.
  * @return  The filter, or a message saying which size is invalid.
  */
-std::expected<KalmanFilter, std::string>
-KalmanFilter::Create(const std::size_t state_dim, const std::size_t measurement_dim, const std::size_t control_dim) {
+Result<KalmanFilter> KalmanFilter::Create(const std::size_t state_dim, const std::size_t measurement_dim,
+                                          const std::size_t control_dim) {
     if (state_dim == 0) {
-        return std::unexpected("The state dimension cannot be zero");
+        return Failure{"The state dimension cannot be zero"};
     }
     if (measurement_dim == 0) {
-        return std::unexpected("The measurement dimension cannot be zero");
+        return Failure{"The measurement dimension cannot be zero"};
     }
     return KalmanFilter(state_dim, measurement_dim, control_dim);
 }
@@ -37,10 +37,9 @@ KalmanFilter::Create(const std::size_t state_dim, const std::size_t measurement_
  * @param[in] initial_state  One value per state.
  * @return  Nothing, or a message when the number of values is wrong.
  */
-std::expected<void, std::string> KalmanFilter::InitializeState(const Vector &initial_state) {
+Result<void> KalmanFilter::InitializeState(const Vector &initial_state) {
     if (initial_state.size() != m_StateDim) {
-        return std::unexpected(
-            std::format("The initial state must have {} elements, not {}", m_StateDim, initial_state.size()));
+        return Failure{Concat("The initial state must have ", m_StateDim, " elements, not ", initial_state.size())};
     }
     m_State = initial_state;
     return {};
@@ -51,7 +50,7 @@ std::expected<void, std::string> KalmanFilter::InitializeState(const Vector &ini
  * @param[in] f  Matrix of size `state_dim x state_dim`.
  * @return  Nothing, or a message when the shape is wrong.
  */
-std::expected<void, std::string> KalmanFilter::SetStateTransitionMatrix(const Matrix &f) {
+Result<void> KalmanFilter::SetStateTransitionMatrix(const Matrix &f) {
     if (const auto shape = CheckShape("The state transition matrix", f, m_StateDim, m_StateDim); !shape) {
         return shape;
     }
@@ -64,9 +63,9 @@ std::expected<void, std::string> KalmanFilter::SetStateTransitionMatrix(const Ma
  * @param[in] b  Matrix of size `state_dim x control_dim`; the filter must have been created with control inputs.
  * @return  Nothing, or a message when the filter has no control inputs or the shape is wrong.
  */
-std::expected<void, std::string> KalmanFilter::SetControlMatrix(const Matrix &b) {
+Result<void> KalmanFilter::SetControlMatrix(const Matrix &b) {
     if (m_ControlDim == 0) {
-        return std::unexpected("The filter has no control inputs, so it has no control matrix");
+        return Failure{"The filter has no control inputs, so it has no control matrix"};
     }
     if (const auto shape = CheckShape("The control matrix", b, m_StateDim, m_ControlDim); !shape) {
         return shape;
@@ -80,7 +79,7 @@ std::expected<void, std::string> KalmanFilter::SetControlMatrix(const Matrix &b)
  * @param[in] h  Matrix of size `measurement_dim x state_dim`.
  * @return  Nothing, or a message when the shape is wrong.
  */
-std::expected<void, std::string> KalmanFilter::SetObservationMatrix(const Matrix &h) {
+Result<void> KalmanFilter::SetObservationMatrix(const Matrix &h) {
     if (const auto shape = CheckShape("The observation matrix", h, m_MeasurementDim, m_StateDim); !shape) {
         return shape;
     }
@@ -93,7 +92,7 @@ std::expected<void, std::string> KalmanFilter::SetObservationMatrix(const Matrix
  * @param[in] q  Matrix of size `state_dim x state_dim`.
  * @return  Nothing, or a message when the shape is wrong.
  */
-std::expected<void, std::string> KalmanFilter::SetProcessNoiseCovariance(const Matrix &q) {
+Result<void> KalmanFilter::SetProcessNoiseCovariance(const Matrix &q) {
     if (const auto shape = CheckShape("The process noise covariance", q, m_StateDim, m_StateDim); !shape) {
         return shape;
     }
@@ -106,7 +105,7 @@ std::expected<void, std::string> KalmanFilter::SetProcessNoiseCovariance(const M
  * @param[in] r  Matrix of size `measurement_dim x measurement_dim`.
  * @return  Nothing, or a message when the shape is wrong.
  */
-std::expected<void, std::string> KalmanFilter::SetMeasurementNoiseCovariance(const Matrix &r) {
+Result<void> KalmanFilter::SetMeasurementNoiseCovariance(const Matrix &r) {
     if (const auto shape = CheckShape("The measurement noise covariance", r, m_MeasurementDim, m_MeasurementDim);
         !shape) {
         return shape;
@@ -120,7 +119,7 @@ std::expected<void, std::string> KalmanFilter::SetMeasurementNoiseCovariance(con
  * @param[in] p  Matrix of size `state_dim x state_dim`.
  * @return  Nothing, or a message when the shape is wrong.
  */
-std::expected<void, std::string> KalmanFilter::SetErrorCovariance(const Matrix &p) {
+Result<void> KalmanFilter::SetErrorCovariance(const Matrix &p) {
     if (const auto shape = CheckShape("The error covariance", p, m_StateDim, m_StateDim); !shape) {
         return shape;
     }
@@ -134,13 +133,12 @@ std::expected<void, std::string> KalmanFilter::SetErrorCovariance(const Matrix &
  * @param[in] control  One value per control input, or empty when there is no control input this step.
  * @return  Nothing, or a message when the filter is not ready or the control input has the wrong size.
  */
-std::expected<void, std::string> KalmanFilter::Predict(const Vector &control) {
+Result<void> KalmanFilter::Predict(const Vector &control) {
     if (!m_IsInitialized) {
-        return std::unexpected("The Kalman filter is not initialized; set the error covariance first");
+        return Failure{"The Kalman filter is not initialized; set the error covariance first"};
     }
     if (!control.empty() && control.size() != m_ControlDim) {
-        return std::unexpected(
-            std::format("The control input must have {} elements, not {}", m_ControlDim, control.size()));
+        return Failure{Concat("The control input must have ", m_ControlDim, " elements, not ", control.size())};
     }
 
     Vector next_state = m_StateTransition * m_State;
@@ -164,13 +162,12 @@ std::expected<void, std::string> KalmanFilter::Predict(const Vector &control) {
  * @return  Nothing, or a message when the filter is not ready, the measurement has the wrong size or the innovation
  *          covariance cannot be inverted.
  */
-std::expected<void, std::string> KalmanFilter::Update(const Vector &measurement) {
+Result<void> KalmanFilter::Update(const Vector &measurement) {
     if (!m_IsInitialized) {
-        return std::unexpected("The Kalman filter is not initialized; set the error covariance first");
+        return Failure{"The Kalman filter is not initialized; set the error covariance first"};
     }
     if (measurement.size() != m_MeasurementDim) {
-        return std::unexpected(
-            std::format("The measurement must have {} elements, not {}", m_MeasurementDim, measurement.size()));
+        return Failure{Concat("The measurement must have ", m_MeasurementDim, " elements, not ", measurement.size())};
     }
 
     const Vector expected_measurement = m_ObservationMatrix * m_State;
@@ -179,10 +176,10 @@ std::expected<void, std::string> KalmanFilter::Update(const Vector &measurement)
         innovation[index] = measurement[index] - expected_measurement[index];
     }
 
-    std::expected<Estimate, std::string> corrected = CorrectEstimate(
-        {.State = m_State, .Covariance = m_ErrorCovariance}, m_ObservationMatrix, m_MeasurementNoise, innovation);
+    Result<Estimate> corrected =
+        CorrectEstimate({m_State, m_ErrorCovariance}, m_ObservationMatrix, m_MeasurementNoise, innovation);
     if (!corrected) {
-        return std::unexpected(corrected.error());
+        return Failure{corrected.Error()};
     }
 
     m_State = std::move(corrected->State);
