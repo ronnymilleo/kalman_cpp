@@ -1,114 +1,154 @@
 /**
- * @file test_matrix.cpp
- * @brief Unit tests for matrix mathematics operations
- * @author ronnymilleo
- * @date 08/07/25
- * @version 1.0
- * 
- * This file contains comprehensive unit tests for the matrix_math module
- * using the Google Test framework. Tests cover all matrix operations
- * including edge cases, error conditions, and numerical accuracy.
- * 
- * @details Test coverage:
- * - Basic operations: addition, subtraction, multiplication
- * - Matrix transformations: transpose, inverse
- * - Vector operations: matrix-vector multiplication
- * - Utility functions: identity matrix generation
- * - Error handling: dimension mismatches, invalid inputs
- * - Numerical accuracy: floating-point precision tests
- * 
- * @note Tests use EXPECT_EQ for exact comparisons where appropriate
- * @note Floating-point comparisons should use EXPECT_NEAR for tolerance
- * @note Each test is self-contained and independent
- * 
- * @see matrix_math.h for function documentation
- * @see matrix_math.cpp for implementation details
+ * @file    matrix_tests.cpp
+ * @brief   Unit tests for the matrix module.
  */
 
+#include "matrix/matrix.h"
+
+#include "test_support.h"
+
 #include <gtest/gtest.h>
-#include "matrix_math.h"
 
-TEST(MatrixMathTest, Add) {
-    const std::vector<std::vector<double>> A = {{1, 2}, {3, 4}};
-    const std::vector<std::vector<double>> B = {{5, 6}, {7, 8}};
-    std::vector<std::vector<double>> result(2, std::vector<double>(2, 0.0));
+namespace {
 
-    matrix_add(A, B, result);
+constexpr double Tolerance = 1e-12;
 
-    EXPECT_EQ(result[0][0], 6);
-    EXPECT_EQ(result[0][1], 8);
-    EXPECT_EQ(result[1][0], 10);
-    EXPECT_EQ(result[1][1], 12);
+} // namespace
+
+TEST(Matrix, ANewMatrixHasTheRequestedShapeAndIsFilledWithZeros) {
+    const Core::Matrix matrix(2, 3);
+
+    EXPECT_EQ(matrix.GetRows(), 2);
+    EXPECT_EQ(matrix.GetCols(), 3);
+    EXPECT_TRUE(Tests::MatrixNear(Core::Matrix({{0, 0, 0}, {0, 0, 0}}), matrix, 0.0));
 }
 
-TEST(MatrixMathTest, Subtract) {
-    const std::vector<std::vector<double>> A = {{5, 6}, {7, 8}};
-    const std::vector<std::vector<double>> B = {{1, 2}, {3, 4}};
-    std::vector<std::vector<double>> result(2, std::vector<double>(2, 0.0));
+TEST(Matrix, ADefaultMatrixIsEmpty) {
+    const Core::Matrix matrix;
 
-    matrix_subtract(A, B, result);
-
-    EXPECT_EQ(result[0][0], 4);
-    EXPECT_EQ(result[0][1], 4);
-    EXPECT_EQ(result[1][0], 4);
-    EXPECT_EQ(result[1][1], 4);
+    EXPECT_TRUE(matrix.IsEmpty());
+    EXPECT_EQ(matrix.GetRows(), 0);
+    EXPECT_EQ(matrix.GetCols(), 0);
 }
 
-TEST(MatrixMathTest, Transpose) {
-    const std::vector<std::vector<double>> A = {{1, 2}, {3, 4}};
-    std::vector<std::vector<double>> result(2, std::vector<double>(2, 0.0));
+TEST(Matrix, NestedListsFillTheMatrixRowByRow) {
+    const Core::Matrix matrix{{1, 2, 3}, {4, 5, 6}};
 
-    matrix_transpose(A, result);
-
-    EXPECT_EQ(result[0][0], 1);
-    EXPECT_EQ(result[0][1], 3);
-    EXPECT_EQ(result[1][0], 2);
-    EXPECT_EQ(result[1][1], 4);
+    EXPECT_EQ(matrix.GetRows(), 2);
+    EXPECT_EQ(matrix.GetCols(), 3);
+    EXPECT_EQ(matrix(0, 2), 3);
+    EXPECT_EQ(matrix(1, 0), 4);
 }
 
-TEST(MatrixMathTest, Multiply) {
-    const std::vector<std::vector<double>> A = {{1, 2}, {3, 4}};
-    const std::vector<std::vector<double>> B = {{5, 6}, {7, 8}};
-    std::vector<std::vector<double>> result(2, std::vector<double>(2, 0.0));
+TEST(Matrix, ElementsCanBeWritten) {
+    Core::Matrix matrix(2, 2);
 
-    matrix_multiply(A, B, result);
+    matrix(1, 0) = 7.5;
 
-    EXPECT_EQ(result[0][0], 19);
-    EXPECT_EQ(result[0][1], 22);
-    EXPECT_EQ(result[1][0], 43);
-    EXPECT_EQ(result[1][1], 50);
+    EXPECT_EQ(matrix(1, 0), 7.5);
+    EXPECT_EQ(matrix(0, 0), 0.0);
 }
 
-TEST(MatrixMathTest, VectorMultiply) {
-    const std::vector<std::vector<double>> A = {{1, 2}, {3, 4}};
-    const std::vector<double> v = {5, 6};
-    std::vector<double> result(2, 0.0);
-
-    matrix_vector_multiply(A, v, result);
-
-    EXPECT_EQ(result[0], 17);
-    EXPECT_EQ(result[1], 39);
+TEST(Matrix, OnlyASquareMatrixIsSquare) {
+    EXPECT_TRUE(Core::Matrix(3, 3).IsSquare());
+    EXPECT_FALSE(Core::Matrix(2, 3).IsSquare());
 }
 
-TEST(MatrixMathTest, Identity) {
-    std::vector<std::vector<double>> result(3, std::vector<double>(3, 0.0));
-    matrix_identity(result);
-
-    EXPECT_EQ(result[0][0], 1);
-    EXPECT_EQ(result[1][1], 1);
-    EXPECT_EQ(result[2][2], 1);
-    EXPECT_EQ(result[0][1], 0);
-    EXPECT_EQ(result[1][2], 0);
+TEST(Matrix, TwoMatricesHaveTheSameShapeWhenRowsAndColumnsMatch) {
+    EXPECT_TRUE(Core::Matrix(2, 3).HasSameShape(Core::Matrix(2, 3)));
+    EXPECT_FALSE(Core::Matrix(2, 3).HasSameShape(Core::Matrix(3, 2)));
 }
 
-TEST(MatrixMathTest, Inverse) {
-    const std::vector<std::vector<double>> A = {{4, 7}, {2, 6}};
-    std::vector<std::vector<double>> result(2, std::vector<double>(2, 0.0));
+TEST(Matrix, TheIdentityHasOnesOnTheDiagonalOnly) {
+    EXPECT_TRUE(Tests::MatrixNear(Core::Matrix({{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}), Core::Matrix::Identity(3), 0.0));
+}
 
-    matrix_inverse(A, result);
+TEST(Matrix, MatricesWithTheSameElementsAreEqual) {
+    EXPECT_EQ(Core::Matrix({{1, 2}, {3, 4}}), Core::Matrix({{1, 2}, {3, 4}}));
+    EXPECT_NE(Core::Matrix({{1, 2}, {3, 4}}), Core::Matrix({{1, 2}, {3, 5}}));
+}
 
-    EXPECT_NEAR(result[0][0], 0.6, 1e-9);
-    EXPECT_NEAR(result[0][1], -0.7, 1e-9);
-    EXPECT_NEAR(result[1][0], -0.2, 1e-9);
-    EXPECT_NEAR(result[1][1], 0.4, 1e-9);
+TEST(Matrix, AddingMatricesAddsEachElement) {
+    const Core::Matrix sum = Core::Matrix({{1, 2}, {3, 4}}) + Core::Matrix({{5, 6}, {7, 8}});
+
+    EXPECT_TRUE(Tests::MatrixNear(Core::Matrix({{6, 8}, {10, 12}}), sum, Tolerance));
+}
+
+TEST(Matrix, SubtractingMatricesSubtractsEachElement) {
+    const Core::Matrix difference = Core::Matrix({{5, 6}, {7, 8}}) - Core::Matrix({{1, 2}, {3, 4}});
+
+    EXPECT_TRUE(Tests::MatrixNear(Core::Matrix({{4, 4}, {4, 4}}), difference, Tolerance));
+}
+
+TEST(Matrix, TransposingARectangularMatrixSwapsItsShape) {
+    const Core::Matrix transposed = Core::Matrix({{1, 2, 3}, {4, 5, 6}}).Transposed();
+
+    EXPECT_TRUE(Tests::MatrixNear(Core::Matrix({{1, 4}, {2, 5}, {3, 6}}), transposed, Tolerance));
+}
+
+TEST(Matrix, MultiplyingMatricesFollowsTheRowByColumnRule) {
+    const Core::Matrix product = Core::Matrix({{1, 2, 3}, {4, 5, 6}}) * Core::Matrix({{7, 8}, {9, 10}, {11, 12}});
+
+    EXPECT_TRUE(Tests::MatrixNear(Core::Matrix({{58, 64}, {139, 154}}), product, Tolerance));
+}
+
+TEST(Matrix, MultiplyingByTheIdentityLeavesAMatrixUnchanged) {
+    const Core::Matrix matrix{{1, 2}, {3, 4}};
+
+    EXPECT_TRUE(Tests::MatrixNear(matrix, matrix * Core::Matrix::Identity(2), Tolerance));
+}
+
+TEST(Matrix, MultiplyingByAVectorGivesOneValueForEachRow) {
+    const Core::Vector product = Core::Matrix({{1, 2, 3}, {4, 5, 6}}) * Core::Vector{1.0, 0.0, -1.0};
+
+    EXPECT_TRUE(Tests::VectorNear({-2.0, -2.0}, product, Tolerance));
+}
+
+TEST(Matrix, TheInverseOfA2x2MatrixMatchesTheClosedForm) {
+    const std::expected<Core::Matrix, std::string> inverse = Core::Matrix({{4, 7}, {2, 6}}).Inverse();
+
+    ASSERT_TRUE(Tests::Succeeded(inverse));
+    EXPECT_TRUE(Tests::MatrixNear(Core::Matrix({{0.6, -0.7}, {-0.2, 0.4}}), *inverse, Tolerance));
+}
+
+TEST(Matrix, AMatrixTimesItsInverseIsTheIdentity) {
+    const Core::Matrix matrix{{2, -1, 0}, {-1, 2, -1}, {0, -1, 2}};
+
+    const std::expected<Core::Matrix, std::string> inverse = matrix.Inverse();
+
+    ASSERT_TRUE(Tests::Succeeded(inverse));
+    EXPECT_TRUE(Tests::MatrixNear(Core::Matrix::Identity(3), matrix * *inverse, Tolerance));
+}
+
+TEST(Matrix, InversionSwapsRowsWhenTheDiagonalHasAZero) {
+    const Core::Matrix matrix{{0, 1}, {1, 0}};
+
+    const std::expected<Core::Matrix, std::string> inverse = matrix.Inverse();
+
+    ASSERT_TRUE(Tests::Succeeded(inverse));
+    EXPECT_TRUE(Tests::MatrixNear(matrix, *inverse, Tolerance));
+}
+
+TEST(Matrix, AMatrixWithTinyEntriesIsStillInvertible) {
+    // A converged covariance can be this small; only a matrix that is singular relative to its scale has no inverse
+    const std::expected<Core::Matrix, std::string> inverse = Core::Matrix({{1e-15, 0}, {0, 1e-15}}).Inverse();
+
+    ASSERT_TRUE(Tests::Succeeded(inverse));
+    EXPECT_NEAR((*inverse)(0, 0), 1e15, 1e3);
+}
+
+TEST(Matrix, ASingularMatrixHasNoInverse) {
+    const std::expected<Core::Matrix, std::string> inverse = Core::Matrix({{1, 2}, {2, 4}}).Inverse();
+
+    ASSERT_FALSE(inverse);
+    EXPECT_NE(inverse.error().find("singular"), std::string::npos);
+}
+
+TEST(Matrix, TheZeroMatrixHasNoInverse) {
+    EXPECT_FALSE(Core::Matrix(2, 2).Inverse());
+}
+
+TEST(Matrix, OnlyANonEmptySquareMatrixCanBeInverted) {
+    EXPECT_FALSE(Core::Matrix({{1, 2, 3}, {4, 5, 6}}).Inverse());
+    EXPECT_FALSE(Core::Matrix().Inverse());
 }

@@ -1,7 +1,7 @@
 # =============================================================================
 # KalmanCpp
 # =============================================================================
-# Kalman filter implementation in C++
+# Kalman and Extended Kalman filters in C++
 #
 # Author: Ronny Milleo
 # License: See LICENSE file in project root
@@ -9,26 +9,29 @@
 
 cmake_minimum_required(VERSION 3.28)
 
-# Project definition with version and metadata
 project(KalmanCpp
-    VERSION 0.1.0
-    DESCRIPTION "Kalman filter implementation in C++"
-    LANGUAGES CXX  # Change to C for C projects
+    VERSION 2.0.0
+    DESCRIPTION "Kalman and Extended Kalman filters in C++"
+    LANGUAGES CXX
 )
+
+# Refuse in-source builds, so a stray `cmake .` never spreads build files among the sources
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    message(FATAL_ERROR "Configure in a separate build folder: cmake -S . -B build")
+endif()
 
 # =============================================================================
 # C++ Standard and Compiler Requirements
 # =============================================================================
 
-# Require modern C++ standard
-set(CMAKE_CXX_STANDARD 23)  # Adjust as needed (17, 20, 23)
+# The code uses C++23 features: std::expected and std::format
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)  # Disable compiler-specific extensions
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# For C projects, use:
-# set(CMAKE_C_STANDARD 99)  # or 11, 17, 23
-# set(CMAKE_C_STANDARD_REQUIRED ON)
-# set(CMAKE_C_EXTENSIONS OFF)
+# The project uses no C++ modules; scanning for them only slows the build down and puts compiler specific flags in
+# compile_commands.json that clang-tidy cannot read
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 # =============================================================================
 # Default Build Type
@@ -44,53 +47,89 @@ endif()
 # Project Options
 # =============================================================================
 
-option(KALMAN_CPP_BUILD_TESTS "Build unit tests" ON)
+option(KALMAN_CPP_BUILD_TESTS "Build unit tests" OFF)
 option(KALMAN_CPP_BUILD_EXAMPLES "Build example programs" ON)
+option(KALMAN_CPP_ENABLE_COVERAGE "Instrument the code for coverage reports" OFF)
+option(KALMAN_CPP_ENABLE_SANITIZERS "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(KALMAN_CPP_WARNINGS_AS_ERRORS "Treat warnings in the project's own code as errors" OFF)
 
 # =============================================================================
 # Compiler Configuration
 # =============================================================================
 
-# Enable compile commands export for IDE support (clangd, etc.)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Set output directories for better organization
 string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_LOWER)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/${BUILD_TYPE_LOWER}/bin")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/${BUILD_TYPE_LOWER}/lib")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/${BUILD_TYPE_LOWER}/lib")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/${BUILD_TYPE_LOWER}/bin")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/${BUILD_TYPE_LOWER}/lib")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/${BUILD_TYPE_LOWER}/lib")
+
+# Strict warnings, sanitizers and coverage for the project's own targets; vendored code is left alone
+function(kalman_cpp_configure_target target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4)
+        if(KALMAN_CPP_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE /WX)
+        endif()
+        if(KALMAN_CPP_ENABLE_SANITIZERS)
+            target_compile_options(${target} PRIVATE /fsanitize=address)
+        endif()
+        return()
+    endif()
+
+    target_compile_options(${target} PRIVATE
+        -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wswitch-enum -Wswitch-default
+    )
+    if(KALMAN_CPP_WARNINGS_AS_ERRORS)
+        target_compile_options(${target} PRIVATE -Werror)
+    endif()
+    if(KALMAN_CPP_ENABLE_SANITIZERS)
+        target_compile_options(${target} PRIVATE
+            -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined
+        )
+        target_link_options(${target} PRIVATE -fsanitize=address,undefined)
+    endif()
+    if(KALMAN_CPP_ENABLE_COVERAGE)
+        target_compile_options(${target} PRIVATE --coverage)
+        target_link_options(${target} PRIVATE --coverage)
+    endif()
+endfunction()
 
 # =============================================================================
 # Formatting Target (clang-format)
 # =============================================================================
 
+set(KALMAN_CPP_FORMAT_SOURCES
+    ${CMAKE_SOURCE_DIR}/examples/demo_support.cpp
+    ${CMAKE_SOURCE_DIR}/examples/demo_support.h
+    ${CMAKE_SOURCE_DIR}/examples/extended_kalman_demo.cpp
+    ${CMAKE_SOURCE_DIR}/examples/kalman_demo.cpp
+    ${CMAKE_SOURCE_DIR}/library/filters/extended_kalman_filter.cpp
+    ${CMAKE_SOURCE_DIR}/library/filters/extended_kalman_filter.h
+    ${CMAKE_SOURCE_DIR}/library/filters/kalman_filter.cpp
+    ${CMAKE_SOURCE_DIR}/library/filters/kalman_filter.h
+    ${CMAKE_SOURCE_DIR}/library/filters/kalman_math.cpp
+    ${CMAKE_SOURCE_DIR}/library/filters/kalman_math.h
+    ${CMAKE_SOURCE_DIR}/library/matrix/matrix.cpp
+    ${CMAKE_SOURCE_DIR}/library/matrix/matrix.h
+    ${CMAKE_SOURCE_DIR}/tests/extended_kalman_filter_tests.cpp
+    ${CMAKE_SOURCE_DIR}/tests/kalman_filter_tests.cpp
+    ${CMAKE_SOURCE_DIR}/tests/kalman_math_tests.cpp
+    ${CMAKE_SOURCE_DIR}/tests/matrix_tests.cpp
+    ${CMAKE_SOURCE_DIR}/tests/test_support.cpp
+    ${CMAKE_SOURCE_DIR}/tests/test_support.h
+)
+
 find_program(CLANG_FORMAT NAMES clang-format)
 if(CLANG_FORMAT)
-    # Collect all source files for formatting
-    file(GLOB_RECURSE ALL_SOURCE_FILES 
-        ${CMAKE_SOURCE_DIR}/application/*.cpp
-        ${CMAKE_SOURCE_DIR}/application/*.h
-        ${CMAKE_SOURCE_DIR}/library/src/*.cpp
-        ${CMAKE_SOURCE_DIR}/library/src/*.cc
-        ${CMAKE_SOURCE_DIR}/library/src/*.c
-        ${CMAKE_SOURCE_DIR}/library/include/*.h
-        ${CMAKE_SOURCE_DIR}/library/include/*.hpp
-        ${CMAKE_SOURCE_DIR}/tests/*.cpp
-        ${CMAKE_SOURCE_DIR}/tests/*.cc
-        ${CMAKE_SOURCE_DIR}/tests/*.c
-        ${CMAKE_SOURCE_DIR}/examples/*.cpp
-        ${CMAKE_SOURCE_DIR}/examples/*.cc
-        ${CMAKE_SOURCE_DIR}/examples/*.c
-    )
-    
     add_custom_target(format
-        COMMAND ${CLANG_FORMAT} -i ${ALL_SOURCE_FILES}
+        COMMAND ${CLANG_FORMAT} -i ${KALMAN_CPP_FORMAT_SOURCES}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Formatting source code with clang-format"
         VERBATIM
     )
 else()
-    message(STATUS "clang-format not found; skipping automatic source formatting")
+    message(STATUS "clang-format not found; the format target does nothing")
     add_custom_target(format
         COMMAND ${CMAKE_COMMAND} -E echo "clang-format not found, skipping formatting"
     )
@@ -100,56 +139,26 @@ endif()
 # Dependencies
 # =============================================================================
 
-add_subdirectory(vendor)
+if(KALMAN_CPP_BUILD_TESTS)
+    add_subdirectory(vendor)
+endif()
 
 # =============================================================================
-# Main Library Target
+# Library
 # =============================================================================
 
 add_subdirectory(library)
 
 # =============================================================================
-# Main Executable Target (if applicable)
-# =============================================================================
-
-add_subdirectory(application)
-
-# Add Windows resource file for icon on Windows
-if(WIN32)
-    set(WINDOWS_RESOURCES ${CMAKE_SOURCE_DIR}/resources.rc)
-else()
-    set(WINDOWS_RESOURCES "")
-endif()
-
-# add_executable(imkalmanfilter
-#     ${CMAKE_SOURCE_DIR}/main.cpp
-#     ${WINDOWS_RESOURCES}
-# )
-
-# target_include_directories(imkalmanfilter
-#     PRIVATE
-#         ${CMAKE_SOURCE_DIR}/application
-#         ${CMAKE_SOURCE_DIR}/library/include
-# )
-
-# target_link_libraries(imkalmanfilter 
-#     PRIVATE 
-#         app_gui
-# )
-
-# # Copy assets folder to output directory after build
-# add_custom_command(TARGET imkalmanfilter POST_BUILD
-#     COMMAND ${CMAKE_COMMAND} -E copy_directory
-#     ${CMAKE_SOURCE_DIR}/assets
-#     $<TARGET_FILE_DIR:imkalmanfilter>/assets
-#     COMMENT "Copying assets to output directory"
-# )
-
-# =============================================================================
 # Examples
 # =============================================================================
 
-if(KALMAN_CPP_BUILD_EXAMPLES AND EXISTS ${CMAKE_SOURCE_DIR}/examples)
+# Enabled before the examples, so that the demonstrations that check themselves can register as tests
+if(KALMAN_CPP_BUILD_TESTS)
+    enable_testing()
+endif()
+
+if(KALMAN_CPP_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
@@ -158,20 +167,20 @@ endif()
 # =============================================================================
 
 if(KALMAN_CPP_BUILD_TESTS)
-    enable_testing()
     add_subdirectory(tests)
 endif()
 
 # =============================================================================
-# Copy compile_commands.json to source dir (for clangd)
+# Post-Build Commands
 # =============================================================================
 
+# Lets clangd and clang-tidy find the compile commands from the project root
 add_custom_target(copy_compile_commands ALL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${CMAKE_BINARY_DIR}/compile_commands.json
-            ${CMAKE_SOURCE_DIR}/compile_commands.json
-    COMMENT "Copying compile_commands.json to source dir for clangd"
-    DEPENDS ${CMAKE_BINARY_DIR}/compile_commands.json
+        "${CMAKE_BINARY_DIR}/compile_commands.json"
+        "${CMAKE_SOURCE_DIR}/compile_commands.json"
+    COMMENT "Copying compile_commands.json to the project root"
+    VERBATIM
 )
 
 # =============================================================================
@@ -180,16 +189,14 @@ add_custom_target(copy_compile_commands ALL
 
 message(STATUS "")
 message(STATUS "=== KalmanCpp Configuration ===")
-message(STATUS "Project:              ${PROJECT_NAME}")
 message(STATUS "Version:              ${PROJECT_VERSION}")
 message(STATUS "Build type:           ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ standard:         ${CMAKE_CXX_STANDARD}")
 message(STATUS "Compiler:             ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "Build tests:          ${KALMAN_CPP_BUILD_TESTS}")
 message(STATUS "Build examples:       ${KALMAN_CPP_BUILD_EXAMPLES}")
-message(STATUS "=========================================")
+message(STATUS "Sanitizers:           ${KALMAN_CPP_ENABLE_SANITIZERS}")
+message(STATUS "Coverage:             ${KALMAN_CPP_ENABLE_COVERAGE}")
+message(STATUS "Warnings as errors:   ${KALMAN_CPP_WARNINGS_AS_ERRORS}")
+message(STATUS "===============================")
 message(STATUS "")
-
-# =============================================================================
-# End of file
-# =============================================================================
