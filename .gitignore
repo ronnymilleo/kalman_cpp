@@ -1,5 +1,6 @@
 # Build artifacts and directories
 build/
+out/
 debug/
 release/
 Debug/

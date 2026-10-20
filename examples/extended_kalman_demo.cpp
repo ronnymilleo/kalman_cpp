@@ -1,341 +1,285 @@
 /**
- * @file extended_kalman_demo.cpp
- * @brief Demonstration application for Extended Kalman Filter
- * @author ronnymilleo
- * @date 12/07/25
- * @version 1.0
- * 
- * This application demonstrates the Extended Kalman Filter implementation
- * with a practical non-linear system: tracking an object moving in a circle
- * with range-only measurements (polar to cartesian coordinates).
- * 
- * @details Scenario:
- * - Object moves in a circular trajectory
- * - State: [x, y, vx, vy] (position and velocity in cartesian coordinates)
- * - Measurements: [range] (distance from origin) 
- * - Non-linear observation function: range = sqrt(x^2 + y^2)
- * - Demonstrates EKF handling of non-linear measurement model
- * 
- * @note This example shows practical usage of the ExtendedKalman class
- * @note Includes noise simulation and performance evaluation
- * @note Results are printed to demonstrate filter convergence
- * 
- * @see extended_kalman.h for class interface
- * @see extended_kalman.cpp for implementation
+ * @file    extended_kalman_demo.cpp
+ * @brief   Demonstrations of the Extended Kalman filter: radar tracking and a damped pendulum, each checking itself.
+ * @details Both demonstrations know the truth they simulate, so they compare the estimate with it and with the raw
+ *          measurements, and fail with a message (and exit code 1) when the filter does no better than the sensor.
  */
 
-#include "extended_kalman.h"
-#include <iostream>
-#include <iomanip>
+#include "demo_support.h"
+#include "filters/extended_kalman_filter.h"
+
+#include <algorithm>
 #include <cmath>
-#include <random>
+#include <cstdlib>
+#include <expected>
+#include <format>
+#include <iostream>
+#include <string>
+#include <string_view>
 #include <vector>
 
-/**
- * @brief Circular motion tracking demonstration
- * 
- * This function demonstrates the Extended Kalman Filter tracking an object
- * moving in a circular path with range-only measurements. The system is
- * non-linear due to the range measurement function.
- */
-void demonstrateCircularMotionTracking() {
-    std::cout << "=== Extended Kalman Filter Demo: Circular Motion Tracking ===\n\n";
-    
-    // System parameters
-    const double dt = 0.1;           // Time step
-    const double radius = 5.0;       // Circle radius
-    const double angular_velocity = 0.2; // rad/s
-    const double process_noise = 0.01;   // Process noise standard deviation
-    const double measurement_noise = 0.1; // Measurement noise standard deviation
-    const int num_steps = 100;           // Number of simulation steps
-    
-    // Create 4D state (x, y, vx, vy), 1D measurement (range) EKF
-    ExtendedKalman ekf(4, 1, 0);
-    
-    // Define non-linear state transition function (constant velocity model with slight perturbation)
-    auto stateTransitionFunc = [dt](const std::vector<double>& x, const std::vector<double>& /*u*/) {
-        return std::vector<double>{
-            x[0] + x[2] * dt,  // x = x + vx * dt
-            x[1] + x[3] * dt,  // y = y + vy * dt
-            x[2],              // vx (constant)
-            x[3]               // vy (constant)
-        };
-    };
-    
-    // Define state Jacobian matrix F = ∂f/∂x
-    auto stateJacobianFunc = [dt](const std::vector<double>& /*x*/) {
-        return std::vector<std::vector<double>>{
-            {1.0, 0.0, dt,  0.0},
-            {0.0, 1.0, 0.0, dt },
-            {0.0, 0.0, 1.0, 0.0},
-            {0.0, 0.0, 0.0, 1.0}
-        };
-    };
-    
-    // Define non-linear observation function h(x) = sqrt(x^2 + y^2)
-    auto observationFunc = [](const std::vector<double>& x) {
-        double range = std::sqrt(x[0] * x[0] + x[1] * x[1]);
-        return std::vector<double>{range};
-    };
-    
-    // Define observation Jacobian matrix H = ∂h/∂x
-    auto observationJacobianFunc = [](const std::vector<double>& x) {
-        double range = std::sqrt(x[0] * x[0] + x[1] * x[1]);
-        if (range < 1e-10) range = 1e-10; // Avoid division by zero
-        
-        return std::vector<std::vector<double>>{
-            {x[0] / range, x[1] / range, 0.0, 0.0}
-        };
-    };
-    
-    // Set up EKF functions
-    ekf.setStateTransitionFunction(stateTransitionFunc);
-    ekf.setStateJacobianFunction(stateJacobianFunc);
-    ekf.setObservationFunction(observationFunc);
-    ekf.setObservationJacobianFunction(observationJacobianFunc);
-    
-    // Set noise covariance matrices
-    std::vector<std::vector<double>> Q = {
-        {process_noise * process_noise, 0.0, 0.0, 0.0},
-        {0.0, process_noise * process_noise, 0.0, 0.0},
-        {0.0, 0.0, process_noise * process_noise * 0.1, 0.0},
-        {0.0, 0.0, 0.0, process_noise * process_noise * 0.1}
-    };
-    
-    std::vector<std::vector<double>> R = {
-        {measurement_noise * measurement_noise}
-    };
-    
-    std::vector<std::vector<double>> P = {
-        {1.0, 0.0, 0.0, 0.0},
-        {0.0, 1.0, 0.0, 0.0},
-        {0.0, 0.0, 1.0, 0.0},
-        {0.0, 0.0, 0.0, 1.0}
-    };
-    
-    ekf.setProcessNoiseCovariance(Q);
-    ekf.setMeasurementNoiseCovariance(R);
-    ekf.setErrorCovariance(P);
-    
-    // Initialize state with a poor initial guess
-    std::vector<double> initialState = {4.0, 3.0, -1.0, 1.0}; // Not exactly on circle
-    ekf.initializeState(initialState);
-    
-    // Set up random number generation for noise
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::normal_distribution<double> process_noise_dist(0.0, process_noise);
-    std::normal_distribution<double> measurement_noise_dist(0.0, measurement_noise);
-    
-    std::cout << std::fixed << std::setprecision(3);
-    std::cout << "Step | True Pos (x,y) | True Range | Meas Range | Est Pos (x,y) | Est Range | Error\n";
-    std::cout << "-----+----------------+------------+------------+---------------+-----------+------\n";
-    
-    // Simulation loop
-    for (int step = 0; step < num_steps; ++step) {
-        double t = step * dt;
-        
-        // Generate true state (circular motion)
-        double true_x = radius * std::cos(angular_velocity * t);
-        double true_y = radius * std::sin(angular_velocity * t);
-        // Note: true velocities calculated but not used in this demo
-        // double true_vx = -radius * angular_velocity * std::sin(angular_velocity * t);
-        // double true_vy = radius * angular_velocity * std::cos(angular_velocity * t);
-        double true_range = std::sqrt(true_x * true_x + true_y * true_y);
-        
-        // Generate noisy measurement
-        double measured_range = true_range + measurement_noise_dist(gen);
-        
-        // EKF predict step
-        ekf.predict();
-        
-        // EKF update step
-        ekf.update({measured_range});
-        
-        // Get current estimate
-        auto& estimated_state = ekf.getState();
-        double estimated_range = std::sqrt(estimated_state[0] * estimated_state[0] + 
-                                         estimated_state[1] * estimated_state[1]);
-        
-        // Calculate position error
-        double position_error = std::sqrt(std::pow(estimated_state[0] - true_x, 2) + 
-                                        std::pow(estimated_state[1] - true_y, 2));
-        
-        // Print results every 10 steps
-        if (step % 10 == 0 || step < 5) {
-            std::cout << std::setw(4) << step << " | ";
-            std::cout << "(" << std::setw(5) << true_x << "," << std::setw(5) << true_y << ") | ";
-            std::cout << std::setw(10) << true_range << " | ";
-            std::cout << std::setw(10) << measured_range << " | ";
-            std::cout << "(" << std::setw(5) << estimated_state[0] << "," << std::setw(5) << estimated_state[1] << ") | ";
-            std::cout << std::setw(9) << estimated_range << " | ";
-            std::cout << std::setw(5) << position_error << "\n";
-        }
-    }
-    
-    std::cout << "\nFilter successfully tracked the circular motion using range-only measurements!\n";
-    std::cout << "Notice how the position estimates converge to the true trajectory.\n\n";
+namespace {
+
+// The filter must cut the error of the raw measurements at least to this share to pass its check
+constexpr double RequiredErrorShare = 0.5;
+
+// Reported by main when a demonstration fails
+constexpr int ExitSuccess = 0;
+constexpr int ExitFailure = 1;
+
+// Every setter reports a problem as a message; chaining them with and_then stops at the first one
+std::expected<void, std::string> Configure(Core::ExtendedKalmanFilter &filter, const Core::Vector &initial_state,
+                                           const Core::ExtendedKalmanFilter::StateTransitionFunction &f,
+                                           const Core::ExtendedKalmanFilter::StateJacobianFunction &jf,
+                                           const Core::ExtendedKalmanFilter::ObservationFunction &h,
+                                           const Core::ExtendedKalmanFilter::ObservationJacobianFunction &jh,
+                                           const Core::Matrix &q, const Core::Matrix &r, const Core::Matrix &p) {
+    return filter.InitializeState(initial_state)
+        .and_then([&] { return filter.SetStateTransitionFunction(f); })
+        .and_then([&] { return filter.SetStateJacobianFunction(jf); })
+        .and_then([&] { return filter.SetObservationFunction(h); })
+        .and_then([&] { return filter.SetObservationJacobianFunction(jh); })
+        .and_then([&] { return filter.SetProcessNoiseCovariance(q); })
+        .and_then([&] { return filter.SetMeasurementNoiseCovariance(r); })
+        .and_then([&] { return filter.SetErrorCovariance(p); });
 }
 
-/**
- * @brief Pendulum tracking demonstration
- * 
- * This function demonstrates EKF tracking of a non-linear pendulum system
- * with angle measurements, showing state estimation for angular position and velocity.
- */
-void demonstratePendulumTracking() {
-    std::cout << "=== Extended Kalman Filter Demo: Pendulum Tracking ===\n\n";
-    
-    // Pendulum parameters
-    const double dt = 0.05;          // Time step
-    const double g = 9.81;           // Gravity
-    const double length = 1.0;       // Pendulum length
-    const double damping = 0.1;      // Damping coefficient
-    const double process_noise = 0.01;   // Process noise
-    const double measurement_noise = 0.05; // Measurement noise
-    const int num_steps = 200;       // Number of simulation steps
-    
-    // Create 2D state (angle, angular_velocity), 1D measurement (angle) EKF
-    ExtendedKalman ekf(2, 1, 0);
-    
-    // Define non-linear state transition function (pendulum dynamics)
-    auto stateTransitionFunc = [dt, g, length, damping](const std::vector<double>& x, const std::vector<double>& /*u*/) {
-        double theta = x[0];      // Current angle
-        double omega = x[1];      // Current angular velocity
-        
-        // Non-linear pendulum equation: theta'' = -(g/L)*sin(theta) - damping*theta'
-        double alpha = -(g / length) * std::sin(theta) - damping * omega;
-        
-        return std::vector<double>{
-            theta + omega * dt,       // New angle
-            omega + alpha * dt        // New angular velocity
-        };
+std::expected<void, std::string> DemonstrateRadarTracking() {
+    std::cout << "=== Extended Kalman filter: radar tracking an aircraft ===\n\n";
+
+    constexpr double TimeStep = 1.0;
+    constexpr double RangeNoise = 0.5;
+    constexpr double BearingNoise = 0.01;
+    // Variance of the small accelerations the constant velocity model ignores; the aircraft does not maneuver
+    constexpr double AccelerationVariance = 1e-4;
+    constexpr int Steps = 60;
+
+    // The aircraft flies in a straight line at constant velocity past a radar at the origin. The radar reports range
+    // and bearing, which are non-linear functions of the position the filter estimates. The track stays within
+    // +-pi of bearing, so the bearing never wraps around
+    constexpr double StartX = 40.0;
+    constexpr double StartY = 20.0;
+    constexpr double TrueVx = -1.0;
+    constexpr double TrueVy = 0.5;
+
+    std::expected<Core::ExtendedKalmanFilter, std::string> created = Core::ExtendedKalmanFilter::Create(4, 2);
+    if (!created) {
+        return std::unexpected(created.error());
+    }
+    Core::ExtendedKalmanFilter &filter = *created;
+
+    // The states are x, y, vx and vy. The first guess is off by several units in position and does not know the
+    // velocity
+    constexpr double Q = AccelerationVariance;
+    constexpr double Dt2 = TimeStep * TimeStep;
+    constexpr double Dt3 = Dt2 * TimeStep;
+    constexpr double Dt4 = Dt2 * Dt2;
+    // clang-format off
+    const std::expected<void, std::string> configured = Configure(
+        filter, {StartX - 5.0, StartY + 5.0, 0.0, 0.0},
+        [](const Core::Vector &state, const Core::Vector & /*control*/) {
+            return Core::Vector{state[0] + state[2] * TimeStep, state[1] + state[3] * TimeStep, state[2], state[3]};
+        },
+        [](const Core::Vector & /*state*/) {
+            return Core::Matrix{{1.0, 0.0, TimeStep, 0.0},
+                                {0.0, 1.0, 0.0, TimeStep},
+                                {0.0, 0.0, 1.0, 0.0},
+                                {0.0, 0.0, 0.0, 1.0}};
+        },
+        [](const Core::Vector &state) { return Core::Vector{std::hypot(state[0], state[1]), std::atan2(state[1], state[0])}; },
+        [](const Core::Vector &state) {
+            const double range_squared = state[0] * state[0] + state[1] * state[1];
+            const double range = std::sqrt(range_squared);
+            return Core::Matrix{{state[0] / range, state[1] / range, 0.0, 0.0},
+                                {-state[1] / range_squared, state[0] / range_squared, 0.0, 0.0}};
+        },
+        {{Q * Dt4 / 4.0, 0.0, Q * Dt3 / 2.0, 0.0},
+         {0.0, Q * Dt4 / 4.0, 0.0, Q * Dt3 / 2.0},
+         {Q * Dt3 / 2.0, 0.0, Q * Dt2, 0.0},
+         {0.0, Q * Dt3 / 2.0, 0.0, Q * Dt2}},
+        {{RangeNoise * RangeNoise, 0.0}, {0.0, BearingNoise * BearingNoise}},
+        {{100.0, 0.0, 0.0, 0.0}, {0.0, 100.0, 0.0, 0.0}, {0.0, 0.0, 10.0, 0.0}, {0.0, 0.0, 0.0, 10.0}});
+    // clang-format on
+    if (!configured) {
+        return configured;
+    }
+
+    Demo::NoiseSource noise(Demo::NoiseSeed);
+
+    std::cout << "Step | True Pos (x,y)  | Meas Pos (x,y)  | Est Pos (x,y)   | Est Vel (x,y) | Est Err | Raw Err\n";
+    std::cout << "-----+-----------------+-----------------+-----------------+---------------+---------+--------\n";
+
+    std::vector<double> estimate_errors;
+    std::vector<double> raw_errors;
+    double true_x = StartX;
+    double true_y = StartY;
+    for (int step = 0; step < Steps; step++) {
+        true_x += TrueVx * TimeStep;
+        true_y += TrueVy * TimeStep;
+
+        // What the radar reports, and the position those numbers point to without any filtering
+        const double measured_range = std::hypot(true_x, true_y) + noise.Gaussian(RangeNoise);
+        const double measured_bearing = std::atan2(true_y, true_x) + noise.Gaussian(BearingNoise);
+        const double raw_x = measured_range * std::cos(measured_bearing);
+        const double raw_y = measured_range * std::sin(measured_bearing);
+
+        if (const auto predicted = filter.Predict(); !predicted) {
+            return predicted;
+        }
+        if (const auto updated = filter.Update({measured_range, measured_bearing}); !updated) {
+            return updated;
+        }
+
+        const Core::Vector &state = filter.GetState();
+        const double estimate_error = std::hypot(state[0] - true_x, state[1] - true_y);
+        const double raw_error = std::hypot(raw_x - true_x, raw_y - true_y);
+        if (step >= Demo::SettlingSteps) {
+            estimate_errors.push_back(estimate_error);
+            raw_errors.push_back(raw_error);
+        }
+        if (step % 10 == 0 || step < 3) {
+            std::cout << std::format("{:4} | ({:6.2f},{:6.2f}) | ({:6.2f},{:6.2f}) | ({:6.2f},{:6.2f}) | "
+                                     "({:5.2f},{:5.2f}) | {:7.3f} | {:7.3f}\n",
+                                     step, true_x, true_y, raw_x, raw_y, state[0], state[1], state[2], state[3],
+                                     estimate_error, raw_error);
+        }
+    }
+
+    std::cout << "\nChecks over the steps after the first " << Demo::SettlingSteps << ":\n";
+    if (const auto better = Demo::CheckImprovement("position error", Demo::RootMeanSquare(estimate_errors),
+                                                   Demo::RootMeanSquare(raw_errors), RequiredErrorShare);
+        !better) {
+        return better;
+    }
+    const Core::Vector &state = filter.GetState();
+    const double velocity_error = std::hypot(state[2] - TrueVx, state[3] - TrueVy);
+    std::cout << std::format("final velocity error: {:.4f} (the filter was never told the velocity)\n", velocity_error);
+    constexpr double MaxVelocityError = 0.1;
+    if (velocity_error > MaxVelocityError) {
+        return std::unexpected(
+            std::format("The final velocity error ({:.4f}) exceeds {}", velocity_error, MaxVelocityError));
+    }
+
+    std::cout << "\nThe filter turns noisy range and bearing readings into a precise position and a velocity.\n\n";
+    return {};
+}
+
+std::expected<void, std::string> DemonstratePendulumTracking() {
+    std::cout << "=== Extended Kalman filter: damped pendulum ===\n\n";
+
+    constexpr double TimeStep = 0.05;
+    constexpr double Gravity = 9.81;
+    constexpr double Length = 1.0;
+    constexpr double Damping = 0.1;
+    constexpr double ProcessNoise = 0.01;
+    constexpr double MeasurementNoise = 0.05;
+    constexpr int Steps = 200;
+
+    std::expected<Core::ExtendedKalmanFilter, std::string> created = Core::ExtendedKalmanFilter::Create(2, 1);
+    if (!created) {
+        return std::unexpected(created.error());
+    }
+    Core::ExtendedKalmanFilter &filter = *created;
+
+    // One step of the pendulum, shared by the simulated truth and by the model of the filter. The velocity is updated
+    // first and the angle moves with the new velocity (semi-implicit Euler): the plain explicit scheme adds energy at
+    // every step and makes a damped pendulum swing higher and higher
+    const auto step_pendulum = [](const Core::Vector &state) {
+        const double acceleration = -(Gravity / Length) * std::sin(state[0]) - Damping * state[1];
+        const double velocity = state[1] + acceleration * TimeStep;
+        return Core::Vector{state[0] + velocity * TimeStep, velocity};
     };
-    
-    // Define state Jacobian matrix
-    auto stateJacobianFunc = [dt, g, length, damping](const std::vector<double>& x) {
-        double theta = x[0];
-        // double omega = x[1]; // Not needed for Jacobian calculation
-        
-        // Partial derivatives
-        double df1_dtheta = 1.0;
-        double df1_domega = dt;
-        double df2_dtheta = -(g / length) * std::cos(theta) * dt;
-        double df2_domega = 1.0 - damping * dt;
-        
-        return std::vector<std::vector<double>>{
-            {df1_dtheta, df1_domega},
-            {df2_dtheta, df2_domega}
-        };
-    };
-    
-    // Define observation function (direct angle measurement)
-    auto observationFunc = [](const std::vector<double>& x) {
-        return std::vector<double>{x[0]}; // Measure angle directly
-    };
-    
-    // Define observation Jacobian matrix
-    auto observationJacobianFunc = [](const std::vector<double>& /*x*/) {
-        return std::vector<std::vector<double>>{{1.0, 0.0}};
-    };
-    
-    // Set up EKF functions
-    ekf.setStateTransitionFunction(stateTransitionFunc);
-    ekf.setStateJacobianFunction(stateJacobianFunc);
-    ekf.setObservationFunction(observationFunc);
-    ekf.setObservationJacobianFunction(observationJacobianFunc);
-    
-    // Set noise covariance matrices
-    std::vector<std::vector<double>> Q = {
-        {process_noise * process_noise, 0.0},
-        {0.0, process_noise * process_noise}
-    };
-    
-    std::vector<std::vector<double>> R = {
-        {measurement_noise * measurement_noise}
-    };
-    
-    std::vector<std::vector<double>> P = {
-        {0.1, 0.0},
-        {0.0, 0.1}
-    };
-    
-    ekf.setProcessNoiseCovariance(Q);
-    ekf.setMeasurementNoiseCovariance(R);
-    ekf.setErrorCovariance(P);
-    
-    // Initialize state
-    std::vector<double> initialState = {0.5, 0.0}; // Start at 0.5 rad, 0 rad/s
-    ekf.initializeState(initialState);
-    
-    // Set up random number generation
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::normal_distribution<double> measurement_noise_dist(0.0, measurement_noise);
-    
-    std::cout << std::fixed << std::setprecision(4);
+
+    // The states are the angle and the angular velocity; the sensor measures the angle only
+    // clang-format off
+    const std::expected<void, std::string> configured = Configure(
+        filter, {0.5, 0.0},
+        [&step_pendulum](const Core::Vector &state, const Core::Vector & /*control*/) { return step_pendulum(state); },
+        [](const Core::Vector &state) {
+            const double velocity_by_angle = -(Gravity / Length) * std::cos(state[0]) * TimeStep;
+            const double velocity_by_velocity = 1.0 - Damping * TimeStep;
+            return Core::Matrix{{1.0 + TimeStep * velocity_by_angle, TimeStep * velocity_by_velocity},
+                                {velocity_by_angle, velocity_by_velocity}};
+        },
+        [](const Core::Vector &state) { return Core::Vector{state[0]}; },
+        [](const Core::Vector & /*state*/) { return Core::Matrix{{1.0, 0.0}}; },
+        {{ProcessNoise * ProcessNoise, 0.0}, {0.0, ProcessNoise * ProcessNoise}},
+        {{MeasurementNoise * MeasurementNoise}},
+        {{0.1, 0.0}, {0.0, 0.1}});
+    // clang-format on
+    if (!configured) {
+        return configured;
+    }
+
+    Demo::NoiseSource noise(Demo::NoiseSeed);
+
     std::cout << "Step | True Angle | True Vel | Meas Angle | Est Angle | Est Vel | Angle Err\n";
     std::cout << "-----+------------+----------+------------+-----------+---------+----------\n";
-    
-    // Initialize true state
-    double true_theta = 0.5;
-    double true_omega = 0.0;
-    
-    // Simulation loop
-    for (int step = 0; step < num_steps; ++step) {
-        // Simulate true pendulum dynamics
-        double alpha = -(g / length) * std::sin(true_theta) - damping * true_omega;
-        true_theta += true_omega * dt;
-        true_omega += alpha * dt;
-        
-        // Generate noisy measurement
-        double measured_angle = true_theta + measurement_noise_dist(gen);
-        
-        // EKF predict and update
-        ekf.predict();
-        ekf.update({measured_angle});
-        
-        // Get current estimate
-        auto& estimated_state = ekf.getState();
-        double angle_error = std::abs(estimated_state[0] - true_theta);
-        
-        // Print results every 20 steps
+
+    std::vector<double> estimate_errors;
+    std::vector<double> raw_errors;
+    std::vector<double> velocity_errors;
+    double true_angle = 0.5;
+    double true_velocity = 0.0;
+    for (int step = 0; step < Steps; step++) {
+        const Core::Vector truth = step_pendulum({true_angle, true_velocity});
+        true_angle = truth[0];
+        true_velocity = truth[1];
+        const double measured_angle = true_angle + noise.Gaussian(MeasurementNoise);
+
+        if (const auto predicted = filter.Predict(); !predicted) {
+            return predicted;
+        }
+        if (const auto updated = filter.Update({measured_angle}); !updated) {
+            return updated;
+        }
+
+        const Core::Vector &state = filter.GetState();
+        if (step >= Demo::SettlingSteps) {
+            estimate_errors.push_back(state[0] - true_angle);
+            raw_errors.push_back(measured_angle - true_angle);
+            velocity_errors.push_back(state[1] - true_velocity);
+        }
         if (step % 20 == 0 || step < 5) {
-            std::cout << std::setw(4) << step << " | ";
-            std::cout << std::setw(10) << true_theta << " | ";
-            std::cout << std::setw(8) << true_omega << " | ";
-            std::cout << std::setw(10) << measured_angle << " | ";
-            std::cout << std::setw(9) << estimated_state[0] << " | ";
-            std::cout << std::setw(7) << estimated_state[1] << " | ";
-            std::cout << std::setw(9) << angle_error << "\n";
+            std::cout << std::format("{:4} | {:10.4f} | {:8.4f} | {:10.4f} | {:9.4f} | {:7.4f} | {:9.4f}\n", step,
+                                     true_angle, true_velocity, measured_angle, state[0], state[1],
+                                     std::abs(state[0] - true_angle));
         }
     }
-    
-    std::cout << "\nEKF successfully estimated pendulum state from noisy angle measurements!\n";
-    std::cout << "The filter estimates both angle and angular velocity from angle-only measurements.\n\n";
+
+    std::cout << "\nChecks over the steps after the first " << Demo::SettlingSteps << ":\n";
+    if (const auto better = Demo::CheckImprovement("angle error", Demo::RootMeanSquare(estimate_errors),
+                                                   Demo::RootMeanSquare(raw_errors), RequiredErrorShare);
+        !better) {
+        return better;
+    }
+    // The sensor reads no velocity, so there are no raw measurements to compare with; the error must simply be small
+    // next to the velocities involved, which reach about 1.5 rad/s
+    constexpr double MaxVelocityError = 0.1;
+    const double velocity_error = Demo::RootMeanSquare(velocity_errors);
+    std::cout << std::format("velocity error: {:.4f} rad/s (the sensor never reads the velocity)\n", velocity_error);
+    if (velocity_error > MaxVelocityError) {
+        return std::unexpected(
+            std::format("The velocity error ({:.4f}) exceeds {} rad/s", velocity_error, MaxVelocityError));
+    }
+
+    std::cout << "\nThe angular velocity is estimated from angle measurements alone.\n\n";
+    return {};
 }
 
-/**
- * @brief Main demonstration function
- */
+} // namespace
+
 int main() {
-    std::cout << "Extended Kalman Filter Demonstrations\n";
+    std::cout << "Extended Kalman filter demonstrations\n";
     std::cout << "=====================================\n\n";
-    
-    try {
-        // Run circular motion tracking demo
-        demonstrateCircularMotionTracking();
-        
-        // Run pendulum tracking demo
-        demonstratePendulumTracking();
-        
-        std::cout << "All demonstrations completed successfully!\n";
-        std::cout << "The Extended Kalman Filter handled non-linear systems effectively.\n";
-        
-    } catch (const std::exception& e) {
-        std::cerr << "Error during demonstration: " << e.what() << std::endl;
-        return 1;
+
+    for (const auto &demonstration : {DemonstrateRadarTracking, DemonstratePendulumTracking}) {
+        if (const std::expected<void, std::string> outcome = demonstration(); !outcome) {
+            std::cerr << "Demonstration failed: " << outcome.error() << "\n";
+            return ExitFailure;
+        }
     }
-    
-    return 0;
+
+    std::cout << "All demonstrations completed.\n";
+    return ExitSuccess;
 }
