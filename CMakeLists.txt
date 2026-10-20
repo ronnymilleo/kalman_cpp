@@ -109,6 +109,8 @@ set(KALMAN_CPP_FORMAT_SOURCES
     ${CMAKE_SOURCE_DIR}/examples/demo_support.h
     ${CMAKE_SOURCE_DIR}/examples/extended_kalman_demo.cpp
     ${CMAKE_SOURCE_DIR}/examples/kalman_demo.cpp
+    ${CMAKE_SOURCE_DIR}/library/core/angle.cpp
+    ${CMAKE_SOURCE_DIR}/library/core/angle.h
     ${CMAKE_SOURCE_DIR}/library/core/result.h
     ${CMAKE_SOURCE_DIR}/library/core/text.h
     ${CMAKE_SOURCE_DIR}/library/filters/extended_kalman_filter.cpp
@@ -119,8 +121,10 @@ set(KALMAN_CPP_FORMAT_SOURCES
     ${CMAKE_SOURCE_DIR}/library/filters/kalman_math.h
     ${CMAKE_SOURCE_DIR}/library/matrix/matrix.cpp
     ${CMAKE_SOURCE_DIR}/library/matrix/matrix.h
+    ${CMAKE_SOURCE_DIR}/tests/angle_tests.cpp
     ${CMAKE_SOURCE_DIR}/tests/extended_kalman_filter_tests.cpp
     ${CMAKE_SOURCE_DIR}/tests/kalman_filter_tests.cpp
+    ${CMAKE_SOURCE_DIR}/tests/kalman_filter_wrap_tests.cpp
     ${CMAKE_SOURCE_DIR}/tests/kalman_math_tests.cpp
     ${CMAKE_SOURCE_DIR}/tests/matrix_tests.cpp
     ${CMAKE_SOURCE_DIR}/tests/test_support.cpp

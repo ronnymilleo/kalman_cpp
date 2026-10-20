@@ -129,7 +129,24 @@ Result<void> KalmanFilter::SetErrorCovariance(const Matrix &p) {
 }
 
 /**
+ * @brief   Sets the function that computes the innovation, so angular measurements can wrap around.
+ * @param[in] residual  Function to use, or empty to subtract the measurement from the prediction.
+ */
+void KalmanFilter::SetResidualFunction(const ResidualFunction &residual) {
+    m_Residual = residual;
+}
+
+/**
+ * @brief   Sets the function that keeps the state valid, such as wrapping angles or normalizing a quaternion.
+ * @param[in] normalizer  Function to use, or empty to leave the state as the filter computes it.
+ */
+void KalmanFilter::SetStateNormalizer(const StateNormalizer &normalizer) {
+    m_Normalizer = normalizer;
+}
+
+/**
  * @brief   Moves the estimate one step forward in time: `x = F x + B u` and `P = F P F^T + Q`.
+ * @details The state normalizer, when set, adjusts the new state before it is stored.
  * @param[in] control  One value per control input, or empty when there is no control input this step.
  * @return  Nothing, or a message when the filter is not ready or the control input has the wrong size.
  */
@@ -150,6 +167,9 @@ Result<void> KalmanFilter::Predict(const Vector &control) {
     }
 
     m_ErrorCovariance = PredictCovariance(m_StateTransition, m_ErrorCovariance, m_ProcessNoise);
+    if (m_Normalizer) {
+        m_Normalizer(next_state);
+    }
     m_State = std::move(next_state);
     return {};
 }
@@ -157,7 +177,8 @@ Result<void> KalmanFilter::Predict(const Vector &control) {
 /**
  * @brief   Corrects the estimate with a measurement.
  * @details Computes the innovation `y = z - H x`, its covariance `S = H P H^T + R`, the gain `K = P H^T S^-1`, and
- *          then `x = x + K y` and `P = (I - K H) P`.
+ *          then `x = x + K y` and `P = (I - K H) P`. The residual function, when set, computes `y` instead of the
+ *          subtraction, and the state normalizer adjusts the corrected state before it is stored.
  * @param[in] measurement  One value per measurement.
  * @return  Nothing, or a message when the filter is not ready, the measurement has the wrong size or the innovation
  *          covariance cannot be inverted.
@@ -171,17 +192,20 @@ Result<void> KalmanFilter::Update(const Vector &measurement) {
     }
 
     const Vector expected_measurement = m_ObservationMatrix * m_State;
-    Vector innovation(m_MeasurementDim);
-    for (std::size_t index = 0; index < m_MeasurementDim; index++) {
-        innovation[index] = measurement[index] - expected_measurement[index];
+    const Result<Vector> innovation = ComputeInnovation(measurement, expected_measurement, m_Residual);
+    if (!innovation) {
+        return Failure{innovation.Error()};
     }
 
     Result<Estimate> corrected =
-        CorrectEstimate({m_State, m_ErrorCovariance}, m_ObservationMatrix, m_MeasurementNoise, innovation);
+        CorrectEstimate({m_State, m_ErrorCovariance}, m_ObservationMatrix, m_MeasurementNoise, *innovation);
     if (!corrected) {
         return Failure{corrected.Error()};
     }
 
+    if (m_Normalizer) {
+        m_Normalizer(corrected->State);
+    }
     m_State = std::move(corrected->State);
     m_ErrorCovariance = std::move(corrected->Covariance);
     return {};
