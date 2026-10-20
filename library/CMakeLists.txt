@@ -1,40 +1,27 @@
 # =============================================================================
-# Main Library Target
+# Core Library
 # =============================================================================
 
-add_library(matrix_math
-    src/matrix_math.cpp
+add_library(kalman-cpp-core-lib STATIC
+    core/angle.cpp
+    core/angle.h
+    core/result.h
+    core/text.h
+    filters/extended_kalman_filter.cpp
+    filters/extended_kalman_filter.h
+    filters/kalman_filter.cpp
+    filters/kalman_filter.h
+    filters/kalman_math.cpp
+    filters/kalman_math.h
+    matrix/matrix.cpp
+    matrix/matrix.h
 )
 
-target_include_directories(matrix_math
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
+# Headers are included relative to this folder, such as "matrix/matrix.h"
+target_include_directories(kalman-cpp-core-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_library(kalman
-    src/kalman.cpp
-)
+kalman_cpp_configure_target(kalman-cpp-core-lib)
+kalman_cpp_target_coverage(kalman-cpp-core-lib)
 
-target_include_directories(kalman
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_link_libraries(kalman
-    PUBLIC
-        matrix_math
-)
-
-add_library(extended_kalman
-    src/extended_kalman.cpp
-)
-
-target_include_directories(extended_kalman
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_link_libraries(extended_kalman
-    PUBLIC
-        matrix_math
-)
+# Formatting runs before every build, so unformatted code never reaches a commit
+add_dependencies(kalman-cpp-core-lib format)

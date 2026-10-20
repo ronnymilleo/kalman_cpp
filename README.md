@@ -1,355 +1,175 @@
-[![CMake on multiple platforms](https://github.com/ronnymilleo/kalman_cpp/actions/workflows/cmake-multi-platform.yml/badge.svg?branch=main)](https://github.com/ronnymilleo/kalman_cpp/actions/workflows/cmake-multi-platform.yml)
+# KalmanCpp
 
-# Kalman Filter Implementation in C++
+[![CI](https://github.com/ronnymilleo/kalman_cpp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ronnymilleo/kalman_cpp/actions/workflows/ci.yml)
+[![Coverage Status](https://coveralls.io/repos/github/ronnymilleo/kalman_cpp/badge.svg?branch=main)](https://coveralls.io/github/ronnymilleo/kalman_cpp?branch=main)
+[![CodeFactor](https://www.codefactor.io/repository/github/ronnymilleo/kalman_cpp/badge)](https://www.codefactor.io/repository/github/ronnymilleo/kalman_cpp)
 
-This repository contains a modern C++ implementation of both standard Kalman filters and Extended Kalman filters (EKF) for real-time state estimation.
+Kalman and Extended Kalman filters in C++17, for real-time state estimation.
 
 ## Features
 
-- **Modern C++ Implementation**: Uses STL containers and RAII principles
-- **Dual Filter Support**: Both linear Kalman filter and Extended Kalman filter implementations
-- **Non-Linear System Support**: EKF handles non-linear state transitions and observation functions
-- **Dynamic Matrix Management**: Efficient std::vector-based matrix storage
-- **Comprehensive Matrix Operations**: Addition, subtraction, multiplication, transpose, and inversion
-- **Exception-Safe Design**: Robust error handling with proper exception management
-- **Function Object Support**: EKF uses std::function for flexible non-linear function specification
-- **Well-Documented API**: Complete Doxygen documentation with usage examples
-- **Comprehensive Unit Tests**: Full test suite using Google Test framework
-- **Example Applications**: 
-  - Linear KF: 1D position tracking with velocity estimation
-  - EKF: Circular motion tracking and pendulum dynamics
+- **Kalman filter** for linear systems and **Extended Kalman filter** for non-linear ones, with optional control input.
+- **No exceptions**: operations that can fail return a `Core::Result<T>` (a value, or a message) that says what was
+  wrong, and a filter is left unchanged when an operation fails.
+- **`Core::Matrix`**: a dense row-major matrix with the arithmetic the filters need (`+`, `-`, `*`, transpose and
+  inverse), so the filter equations read like the textbook.
+- **Unit tests** with GoogleTest, and two demonstration programs.
 
-## Project Structure
+## Project structure
 
 ```
-├── kalman.h               # Standard Kalman filter class interface
-├── kalman.cpp             # Standard Kalman filter implementation
-├── extended_kalman.h      # Extended Kalman filter class interface  
-├── extended_kalman.cpp    # Extended Kalman filter implementation
-├── matrix_math.h          # Matrix operations interface
-├── matrix_math.cpp        # Matrix operations implementation
-├── kalman_demo.cpp        # Standard Kalman filter demo
-├── extended_kalman_demo.cpp # Extended Kalman filter demonstrations
-├── tests/
-│   ├── test_matrix.cpp            # Unit tests for matrix operations
-│   ├── test_kalman.cpp            # Unit tests for standard Kalman filter
-│   ├── test_extended_kalman.cpp   # Unit tests for EKF
-│   └── CMakeLists.txt
-├── example-c/             # C implementation examples
-│   ├── kalman.c
-│   └── kalman.h
-├── CMakeLists.txt         # Build configuration
-└── CMakePresets.json      # CMake presets for different configurations
+├── library/
+│   ├── core/                 # Core::Result, Core::Concat and the angle helpers
+│   ├── matrix/               # Core::Matrix
+│   └── filters/              # KalmanFilter, ExtendedKalmanFilter and the equations they share
+├── examples/                 # kalman_demo and extended_kalman_demo
+├── tests/                    # One <module>_tests.cpp per module
+├── vendor/googletest         # GoogleTest (git submodule)
+└── CMakeLists.txt
 ```
 
 ## Building
 
-### Prerequisites
-- CMake 3.14 or higher
-- C++11-compatible compiler (GCC, Clang, MSVC)
-- Google Test framework (for unit tests)
-- Doxygen (optional, for generating documentation)
-
-### Build Instructions
+You need CMake 3.28 or newer, Ninja and a C++17 compiler (GCC, Clang or MSVC).
 
 ```bash
-# Configure
+# GoogleTest is only needed for the tests
+git submodule update --init vendor/googletest
+
 cmake --preset debug
-cmake --preset release
-
-# Build
 cmake --build --preset debug
-cmake --build --preset release
-
-# Run tests
-ctest --preset debug          # Run tests (debug build)
-ctest --preset release        # Run tests (release build)
+ctest --preset debug
 ```
 
-## Usage Examples
+The presets are `debug`, `release`, `clang-debug` and `clang-release`, and build into `build/<preset>`. Binaries and
+libraries end up in `out/<build type>/bin` and `out/<build type>/lib`.
 
-### Standard Kalman Filter
+Without presets:
+
+```bash
+cmake -S . -B build -G Ninja -DKALMAN_CPP_BUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+| Option                         | Default | Purpose                                            |
+|--------------------------------|---------|----------------------------------------------------|
+| `KALMAN_CPP_BUILD_TESTS`       | `OFF`   | Build the unit tests                               |
+| `KALMAN_CPP_BUILD_EXAMPLES`    | `ON`    | Build the demonstration programs                   |
+| `KALMAN_CPP_WARNINGS_AS_ERRORS`| `OFF`   | Make warnings in the project's code fail the build |
+| `KALMAN_CPP_ENABLE_SANITIZERS` | `OFF`   | AddressSanitizer and UndefinedBehaviorSanitizer    |
+| `KALMAN_CPP_ENABLE_COVERAGE`   | `OFF`   | Instrument the library for `gcov` (GCC or Clang)   |
+
+Building also runs `clang-format` over the sources when it is installed, through the `format` target.
+
+To use the library in another CMake project, add this folder with `add_subdirectory` and link `kalman-cpp-core-lib`.
+Headers are included relative to `library/`, such as `#include "filters/kalman_filter.h"`.
+
+## Usage
+
+### Linear filter
 
 ```cpp
-#include "kalman.h"
+#include "filters/kalman_filter.h"
 
-// Create a 2D state, 1D measurement Kalman filter
-kalman kf(2, 1, 0);
+// Track position and velocity from position measurements
+constexpr double TimeStep = 0.1;
 
-// Initialize state [position=0, velocity=0]
-std::vector<double> initialState = {0.0, 0.0};
-kf.initializeState(initialState);
+Core::Result<Core::KalmanFilter> created = Core::KalmanFilter::Create(2, 1);
+if (!created) {
+    return created.Error();
+}
+Core::KalmanFilter &filter = *created;
 
-// Set up state transition matrix (constant velocity model)
-std::vector<std::vector<double>> F = {
-    {1.0, 1.0},  // dt = 1.0
-    {0.0, 1.0}
-};
-kf.setStateTransitionMatrix(F);
+// Each setter returns a message when it fails; AndThen stops at the first one
+const Core::Result<void> configured =
+    filter.InitializeState({0.0, 0.0})
+        .AndThen([&] { return filter.SetStateTransitionMatrix({{1.0, TimeStep}, {0.0, 1.0}}); })
+        .AndThen([&] { return filter.SetObservationMatrix({{1.0, 0.0}}); })
+        .AndThen([&] { return filter.SetProcessNoiseCovariance({{0.01, 0.0}, {0.0, 0.01}}); })
+        .AndThen([&] { return filter.SetMeasurementNoiseCovariance({{0.25}}); })
+        .AndThen([&] { return filter.SetErrorCovariance({{1.0, 0.0}, {0.0, 1.0}}); }); // ready once P is set
+if (!configured) {
+    return configured.Error();
+}
 
-// Set up observation matrix (measure position only)
-std::vector<std::vector<double>> H = {
-    {1.0, 0.0}
-};
-kf.setObservationMatrix(H);
-
-// Set process noise covariance
-std::vector<std::vector<double>> Q = {
-    {0.1, 0.0},
-    {0.0, 0.1}
-};
-kf.setProcessNoiseCovariance(Q);
-
-// Set measurement noise covariance
-std::vector<std::vector<double>> R = {{0.5}};
-kf.setMeasurementNoiseCovariance(R);
-
-// Set initial error covariance
-std::vector<std::vector<double>> P = {
-    {1.0, 0.0},
-    {0.0, 1.0}
-};
-kf.setErrorCovariance(P);
-
-// Filter cycle
-for (auto measurement : measurements) {
-    kf.predict();              // Prediction step
-    kf.update({measurement});  // Update step
-    
-    auto state = kf.getState();
-    std::cout << "Position: " << state[0] << ", Velocity: " << state[1] << std::endl;
+if (filter.Predict() && filter.Update({1.2})) {
+    const double position = filter.GetState()[0];
+    const double velocity = filter.GetState()[1];
 }
 ```
 
-### Extended Kalman Filter
+### Extended filter
+
+The model is given as functions, together with their Jacobians. The setters return a `Core::Result<void>`; check them as
+in the example above.
 
 ```cpp
-#include "extended_kalman.h"
+#include "filters/extended_kalman_filter.h"
 
-// Create a 2D state, 1D measurement Extended Kalman filter
-ExtendedKalman ekf(2, 1, 0);
+Core::Result<Core::ExtendedKalmanFilter> created = Core::ExtendedKalmanFilter::Create(2, 1);
+Core::ExtendedKalmanFilter &filter = *created; // after checking `created`, as above
 
-// Define non-linear state transition function
-auto stateFunc = [](const std::vector<double>& x, const std::vector<double>& u) {
-    double dt = 0.1;
-    return std::vector<double>{
-        x[0] + x[1] * dt,  // position = position + velocity * dt
-        x[1]               // velocity (constant)
-    };
-};
-
-// Define state Jacobian matrix
-auto stateJacFunc = [](const std::vector<double>& x) {
-    double dt = 0.1;
-    return std::vector<std::vector<double>>{
-        {1.0, dt},
-        {0.0, 1.0}
-    };
-};
-
-// Define non-linear observation function (range measurement)
-auto obsFunc = [](const std::vector<double>& x) {
-    double range = std::sqrt(x[0] * x[0] + x[1] * x[1]);
-    return std::vector<double>{range};
-};
-
-// Define observation Jacobian matrix
-auto obsJacFunc = [](const std::vector<double>& x) {
-    double range = std::sqrt(x[0] * x[0] + x[1] * x[1]);
-    if (range < 1e-10) range = 1e-10; // Avoid division by zero
-    
-    return std::vector<std::vector<double>>{
-        {x[0] / range, x[1] / range}
-    };
-};
-
-// Set up EKF functions
-ekf.setStateTransitionFunction(stateFunc);
-ekf.setStateJacobianFunction(stateJacFunc);
-ekf.setObservationFunction(obsFunc);
-ekf.setObservationJacobianFunction(obsJacFunc);
-
-// Set noise covariance matrices (same as standard KF)
-// ... initialize Q, R, P matrices ...
-
-ekf.setProcessNoiseCovariance(Q);
-ekf.setMeasurementNoiseCovariance(R);
-ekf.setErrorCovariance(P);
-
-// Initialize state
-std::vector<double> initialState = {1.0, 0.5};
-ekf.initializeState(initialState);
-
-// Filter cycle
-for (auto measurement : measurements) {
-    ekf.predict();              // Non-linear prediction step
-    ekf.update({measurement});  // Non-linear update step
-    
-    auto state = ekf.getState();
-    std::cout << "Position: " << state[0] << ", Velocity: " << state[1] << std::endl;
-}
+const Core::Result<void> configured =
+    filter
+        .SetStateTransitionFunction([](const Core::Vector &state, const Core::Vector & /*control*/) {
+            return Core::Vector{state[0] + state[1], state[1]};
+        })
+        .AndThen([&] {
+            return filter.SetStateJacobianFunction(
+                [](const Core::Vector & /*state*/) { return Core::Matrix{{1.0, 1.0}, {0.0, 1.0}}; });
+        })
+        .AndThen([&] {
+            return filter.SetObservationFunction(
+                [](const Core::Vector &state) { return Core::Vector{std::hypot(state[0], state[1])}; });
+        })
+        .AndThen([&] {
+            return filter.SetObservationJacobianFunction([](const Core::Vector &state) {
+                const double range = std::hypot(state[0], state[1]);
+                return Core::Matrix{{state[0] / range, state[1] / range}};
+            });
+        });
 ```
 
-## Running the Demonstrations
+`Predict()` and `Update()` fail with a message until the four functions and the error covariance are set.
 
-The project includes two demonstration programs:
+### Angles
 
-### Standard Kalman Filter Demo
-```bash
-./Release/bin/kalman_demo
-```
-This demonstrates 1D position tracking with velocity estimation using a linear constant velocity model.
+A heading or a bearing lives on a circle: 179 degrees measured against a prediction of -179 degrees is a 2 degree error,
+not 358, and a plain subtraction gets it wrong. Two optional hooks fix that, in the linear and the extended filter alike:
 
-### Extended Kalman Filter Demo
-```bash
-./Release/bin/extended_kalman_demo
-```
-This demonstrates two non-linear scenarios:
-1. **Circular Motion Tracking**: Tracks an object moving in a circle using range-only measurements
-2. **Pendulum Dynamics**: Estimates pendulum angle and angular velocity from noisy angle measurements
+```cpp
+#include "core/angle.h"
 
-## Running Tests
-
-```bash
-# Run all tests
-ctest
-
-# Run specific test suite
-ctest -R "Kalman"          # Standard KF tests only
-ctest -R "ExtendedKalman"  # EKF tests only
-ctest -R "MatrixMath"      # Matrix operation tests only
-
-# Run tests with verbose output
-ctest --verbose
+filter.SetResidualFunction([](const Core::Vector &measurement, const Core::Vector &expected) {
+    return Core::Vector{Core::AngleDifference(measurement[0], expected[0])}; // computes the innovation y
+});
+filter.SetStateNormalizer([](Core::Vector &state) {
+    state[0] = Core::WrapAngle(state[0]); // adjusts the state before Predict() and Update() store it
+});
 ```
 
-## Key Differences: Kalman Filter vs Extended Kalman Filter
+The residual function replaces `y = z - h(x)`, and the state normalizer is the place to wrap angle states, or to
+renormalize any other state with a constraint, once the filter has moved it. Both are empty by default, which keeps the
+plain subtraction and leaves the state as computed; passing an empty function clears them.
 
-| Feature | Kalman Filter | Extended Kalman Filter |
-|---------|---------------|------------------------|
-| **System Model** | Linear | Non-linear |
-| **State Transition** | Matrix multiplication (F·x) | Non-linear function f(x,u) |
-| **Observation Model** | Matrix multiplication (H·x) | Non-linear function h(x) |
-| **Linearization** | Not required | Uses Jacobian matrices |
-| **Computational Cost** | Lower | Higher (due to Jacobian computation) |
-| **Accuracy** | Optimal for linear systems | Approximation for non-linear systems |
-| **Use Cases** | Linear tracking, simple models | Radar tracking, robotics, GPS/INS |
+## Mathematical background
 
-## Mathematical Background
+### Prediction
 
-### Standard Kalman Filter Equations
+- **Linear**: `x = F x + B u`
+- **Extended**: `x = f(x, u)`, with `F` the Jacobian of `f` evaluated at the estimate the step starts from
+- **Covariance**: `P = F P Fᵀ + Q`
 
-**Prediction:**
-- x̂(k|k-1) = F·x̂(k-1|k-1) + B·u(k-1)
-- P(k|k-1) = F·P(k-1|k-1)·F^T + Q
+### Update
 
-**Update:**
-- K(k) = P(k|k-1)·H^T·[H·P(k|k-1)·H^T + R]^(-1)
-- x̂(k|k) = x̂(k|k-1) + K(k)·[z(k) - H·x̂(k|k-1)]
-- P(k|k) = [I - K(k)·H]·P(k|k-1)
-
-### Extended Kalman Filter Equations
-
-**Prediction:**
-- x̂(k|k-1) = f(x̂(k-1|k-1), u(k-1))
-- F(k) = ∂f/∂x |_(x̂(k-1|k-1))
-- P(k|k-1) = F(k)·P(k-1|k-1)·F(k)^T + Q
-
-**Update:**
-- H(k) = ∂h/∂x |_(x̂(k|k-1))
-- K(k) = P(k|k-1)·H(k)^T·[H(k)·P(k|k-1)·H(k)^T + R]^(-1)
-- x̂(k|k) = x̂(k|k-1) + K(k)·[z(k) - h(x̂(k|k-1))]
-- P(k|k) = [I - K(k)·H(k)]·P(k|k-1)
-
-## Documentation
-
-This project includes comprehensive Doxygen documentation.
-
-### Documentation Features
-- **Complete API Reference**: All classes, methods, and parameters documented
-- **Usage Examples**: Practical C++ code examples for each function
-- **Mathematical Background**: Detailed explanation of Kalman filter equations
-- **Group Organization**: Methods organized by purpose (constructors, operations, etc.)
-- **Cross-References**: Links between related classes and functions
-- **Exception Documentation**: All possible exceptions and error conditions
-
-## API Reference
-
-### Kalman Filter Class
-
-- `kalman()` - Constructors (default and parameterized)
-- `initializeState()` - Set initial state vector
-- `setStateTransitionMatrix()` - Set F matrix (system dynamics)
-- `setControlMatrix()` - Set B matrix (control inputs)
-- `setObservationMatrix()` - Set H matrix (measurement model)
-- `setProcessNoiseCovariance()` - Set Q matrix (process uncertainty)
-- `setMeasurementNoiseCovariance()` - Set R matrix (measurement uncertainty)
-- `setErrorCovariance()` - Set P matrix (initial state uncertainty)
-- `predict()` - Prediction step of the filter
-- `update()` - Correction step of the filter
-- `getState()` - Get current state vector
-- `getStateElement()` - Get specific state element
-- `getErrorCovariance()` - Get current error covariance matrix
-- `reset()` - Reset filter to uninitialized state
-- `isInitialized()` - Check if filter is ready for use
-
-### Extended Kalman Filter Class
-
-- `ExtendedKalman()` - Constructors (default and parameterized)
-- `initializeState()` - Set initial state vector
-- `setStateTransitionFunction()` - Set non-linear state transition function f(x,u)
-- `setStateJacobianFunction()` - Set Jacobian matrix function ∂f/∂x
-- `setObservationFunction()` - Set non-linear observation function h(x)
-- `setObservationJacobianFunction()` - Set observation Jacobian function ∂h/∂x
-- `setControlMatrix()` - Set B matrix (control inputs)
-- `setProcessNoiseCovariance()` - Set Q matrix (process uncertainty)
-- `setMeasurementNoiseCovariance()` - Set R matrix (measurement uncertainty)
-- `setErrorCovariance()` - Set P matrix (initial state uncertainty)
-- `predict()` - Non-linear prediction step with Jacobian linearization
-- `update()` - Non-linear update step with observation Jacobian
-- `getState()` - Get current state vector
-- `getStateElement()` - Get specific state element
-- `getErrorCovariance()` - Get current error covariance matrix
-- `reset()` - Reset filter to uninitialized state
-- `isInitialized()` - Check if filter is ready for use
-
-### Matrix Functions
-
-- `matrix_add()` - Matrix addition (A + B)
-- `matrix_subtract()` - Matrix subtraction (A - B)
-- `matrix_multiply()` - Matrix multiplication (A * B)
-- `matrix_vector_multiply()` - Matrix-vector multiplication (A * v)
-- `matrix_transpose()` - Matrix transpose (A^T)
-- `matrix_inverse()` - Matrix inversion (A^-1) using Gaussian elimination
-- `matrix_identity()` - Create identity matrix
-
-## Mathematical Background
-
-The Kalman filter implementation follows the standard discrete-time formulation:
-
-**Prediction Step:**
-- State prediction: `x(k|k-1) = F * x(k-1|k-1) + B * u(k-1)`
-- Covariance prediction: `P(k|k-1) = F * P(k-1|k-1) * F^T + Q`
-
-**Update Step:**
-- Innovation (residual): `y(k) = z(k) - H * x(k|k-1)`
-- Innovation covariance: `S(k) = H * P(k|k-1) * H^T + R`
-- Kalman gain: `K(k) = P(k|k-1) * H^T * S(k)^(-1)`
-- State update: `x(k|k) = x(k|k-1) + K(k) * y(k)`
-- Covariance update: `P(k|k) = (I - K(k) * H) * P(k|k-1)`
-
-Where:
-- `x` = state vector
-- `F` = state transition matrix
-- `B` = control matrix (optional)
-- `u` = control vector (optional)
-- `Q` = process noise covariance
-- `H` = observation matrix
-- `R` = measurement noise covariance
-- `P` = error covariance matrix
-- `z` = measurement vector
-- `I` = identity matrix
+- **Innovation**: `y = z - H x` (linear) or `y = z - h(x)` (extended, with `H` the Jacobian of `h`); a residual
+  function can replace the subtraction
+- **Innovation covariance**: `S = H P Hᵀ + R`
+- **Kalman gain**: `K = P Hᵀ S⁻¹`
+- **State**: `x = x + K y`
+- **Covariance**: `P = (I - K H) P`
 
 ## License
 
-This project is licensed under the GNU GPLv3 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU GPLv3. See the [LICENSE](LICENSE) file for details.
