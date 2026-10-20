@@ -45,7 +45,7 @@ Core::Result<void> Configure(Core::ExtendedKalmanFilter &filter, const Core::Vec
 Core::Result<void> DemonstrateRadarTracking() {
     std::cout << "=== Extended Kalman filter: radar tracking an aircraft ===\n\n";
 
-    constexpr double TimeStep = 1.0;
+    static constexpr double TimeStep = 1.0;
     constexpr double RangeNoise = 0.5;
     constexpr double BearingNoise = 0.01;
     // Variance of the small accelerations the constant velocity model ignores; the aircraft does not maneuver
@@ -166,10 +166,10 @@ Core::Result<void> DemonstrateRadarTracking() {
 Core::Result<void> DemonstratePendulumTracking() {
     std::cout << "=== Extended Kalman filter: damped pendulum ===\n\n";
 
-    constexpr double TimeStep = 0.05;
-    constexpr double Gravity = 9.81;
-    constexpr double Length = 1.0;
-    constexpr double Damping = 0.1;
+    static constexpr double TimeStep = 0.05;
+    static constexpr double Gravity = 9.81;
+    static constexpr double Length = 1.0;
+    static constexpr double Damping = 0.1;
     constexpr double ProcessNoise = 0.01;
     constexpr double MeasurementNoise = 0.05;
     constexpr int Steps = 200;
